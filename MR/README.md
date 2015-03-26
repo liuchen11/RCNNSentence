@@ -4,4 +4,5 @@ Simply run the command `python parserMR.py` in this folder to generate file `dat
 ```
 list[0]: list, each entry is a dict: {'label': category, 'text': raw sentence, 'setLabel': subset ID, 'len': length of this sentence}.
 list[1]: dict, each entry is a word and its corresponding document frequency.
+list[2]: dict, config information, 'all'/'train'/'test'/'dev': all/train/test/dev subsets ID, 'cross': whether or not to use cross-validation
 ```
