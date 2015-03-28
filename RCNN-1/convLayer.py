@@ -27,6 +27,9 @@ class ConvPool(object):
 
 		assert filters[1]==shape[1]
 		self.input=input
+		self.shape=shape
+		self.filters=filters
+		self.pool=pool
 
 		#num of input to each hidden unit
 		inflow=np.prod(filters[1:])
@@ -69,3 +72,27 @@ class ConvPool(object):
 
 		self.param=[self.w,self.b]
 
+	def process(self,data,batchSize):
+		'''
+		>>>process newly input data
+
+		>>>type data: T.tensor4
+		>>>para data: newly input data
+		>>>type batchSize: int
+		>>>para batchSize: minibatch size
+		'''
+		shape=(batchSize,1,self.shape[2],self.shape[3])
+
+		conv_out=conv.conv2d(
+			input=input,
+			filters=self.w,
+			filter_shape=self.filters,
+			image_shape=shape
+		)
+		pool_out=downsample.max_pool_2d(
+			input=conv_out,
+			ds=pool,
+			ignore_border=True
+		)
+		output=T.tanh(pool_out+self.b.dimshuffle('x',0,'x','x'))
+		return output

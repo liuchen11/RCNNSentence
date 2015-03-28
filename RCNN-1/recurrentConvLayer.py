@@ -73,8 +73,13 @@ class RecurrentConvLayer(object):
 		assert filters[0]==rfilter[0]
 		assert rfilter[0]==rfilter[1]
 		self.input=input
+		self.filters=filters
+		self.rfilter=rfilter
+		self.shape=shape
+		self.time=time
+		self.pool=pool
 		layer_size=(shape[0],filters[0],shape[2]-filters[2]+1,shape[3]-filters[3]+1)
-		
+
 		inflow=np.prod(filters[1:])
 		outflow=filters[0]*np.prod(filters[2:])/np.prod(pool)
 
@@ -128,3 +133,49 @@ class RecurrentConvLayer(object):
 		self.param=[self.w_in,self.w_r,self.b,self.b_r]
 		
 		print 'recurrentconvlayer constructed!'
+
+	def process(self,data,batchSize):
+		'''
+		>>>process new data
+
+		>>>type data: T.tensor4
+		>>>para data: newly processed data
+		>>>type batchSize: int
+		>>>para batchSize: batch size
+		'''
+		shape=(batchSize,1,self.shape[2],self.shape[3])
+		layer_size=(batchSize,self.filters[0],shape[2]-self.filters[2]+1,shape[3]-self.filters[3]+1)
+
+		conv_input=conv.conv2d(
+			input=data,
+			filters=self.w_in,
+			filter_shape=self.filters,
+			image_shape=shape
+		)
+
+		state=conv_input+self.b_r
+		for i in xrange(self.time):
+			padded_input=TensorPadding(TensorPadding(input=state,width=self.rfilter[2]-1,axis=2),width=self.rfilter[3]-1,axis=3)
+			conv_recurrent=conv.conv2d(
+				input=padded_input,
+				filters=self.w_r,
+				filter_shape=self.rfilter,
+				image_shape=[layer_size[0],layer_size[1],layer_size[2]+self.rfilter[2]-1,layer_size[3]+self.rfilter[3]-1]
+			)
+			state=ReLU(conv_input+conv_recurrent)
+			norm=NormLayer(
+				input=state,
+				shape=layer_size,
+				alpha=alpha,
+				beta=beta,
+				N=N
+			)
+			state=norm.output
+
+		pool_out=downsample.max_pool_2d(
+			input=state,
+			ds=self.pool,
+			ignore_border=True
+		)
+		output=pool_out+self.b.dimshuffle('x',0,'x','x')
+		return output
