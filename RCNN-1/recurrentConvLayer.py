@@ -40,31 +40,6 @@ def TensorPadding(input,axis,width):
 		input=T.concatenate([input,right],axis=axis)
 	return input
 
-def Padding(input,width,height):
-	'''
-	>>>type input: T.matrix
-	>>>para input: input tensor
-
-	>>>type width/height: int
-	>>>para width/height: the width/height of the filter
-	'''
-	input_width=input.shape[0]
-	input_height=input.shape[1]
-
-	pad_width_left=(width+1)/2
-	pad_width_right=width/2
-	pad_height_up=(height+1)/2
-	pad_height_down=height/2
-
-	left=T.zeros([pad_width_left,input_height])
-	right=T.zeros([pad_width_right,input_height])
-	input=T.concatenate([left,input,right],axis=0)
-
-	up=T.zeros([width+input_width,pad_height_up])
-	down=T.zeros([width+input_width,pad_height_down])
-	input=T.concatenate([up,input,down],axis=1)
-	return input
-
 class RecurrentConvLayer(object):
 	
 	def __init__(self,rng,input,shape,filters,rfilter,alpha,beta,N,time,pool):
@@ -143,34 +118,6 @@ class RecurrentConvLayer(object):
 				N=N
 			)
 			state=norm.output
-
-		#def step(x_input,state):
-		#	tmp_value=T.zeros(state.shape)
-		#	for i in xrange(layer_size[0]):
-		#		for j in xrange(layer_size[1]):
-		#			padded_input=Padding(input=state[i,j],height=rfilter[1],width=rfilter[2])
-		#			conv_recurrent=conv.conv2d(
-		#				input=padded_input.dimshuffle('x','x',0,1),
-		#				filters=self.w_r[j].dimshuffle('x','x',0,1),		#warning non-shared variable!
-		#				filter_shape=[1,1,rfilter[1],rfilter[2]],
-		#				image_shape=[1,1,layer_size[2],layer_size[3]]
-		#			)
-		#			tmp_value=T.set_subtensor(tmp_value[i,j],ReLU(conv_recurrent[0,0]+x_input[i,j]))
-		#		for x in xrange(layer_size[2]):
-		#			for y in xrange(layer_size[3]):
-		#				for k in xrange(layer_size[1]):
-		#					norm=1
-							#norm=0.0
-							#for n in xrange(N):
-							#	if k-N/2+n>=0 and k-N/2+n<layer_size[1]:
-							#		norm+=tmp_value[i,k-N/2+n,x,y]**2
-							#norm=(norm*alpha/N+1)**beta
-		#					state=T.set_subtensor(state[i,k,x,y],tmp_value[i,k,x,y]/norm)
-		#	return state
-
-		#print 'begin scan'
-
-		#state,_=theano.scan(iteration,non_sequences=conv_input,outputs_info=self.b_r,n_steps=time)
 
 		pool_out=downsample.max_pool_2d(
 			input=state,
