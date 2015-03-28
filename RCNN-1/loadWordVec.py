@@ -1,7 +1,7 @@
 import cPickle
 import numpy as np
 
-def loadBinVec(fileName,vocab)
+def loadBinVec(fileName,vocab):
 	'''
 	>>>load *.bin file and return word embeddings of the vocabulary, and its dimension
 	'''
@@ -25,7 +25,7 @@ def loadBinVec(fileName,vocab)
 				f.read(binaryLen)
 	return layerSize,wordVec
 
-def getWordVec(configFileName,vecFileName)
+def getWordVec(configFileName,vecFileName):
 	'''
 	>>>load wordvecs and initialize unknow word's vector randomly
 	'''
@@ -36,7 +36,7 @@ def getWordVec(configFileName,vecFileName)
 			wordVec[word]=np.random.uniform(-0.25,0.25,dimension)
 	return dimension,wordVec
 
-def getRandWordVec(configFileName,dimension)
+def getRandWordVec(configFileName,dimension):
 	'''
 	>>>initialize the word vectors randomly given a dimension value
 	'''
