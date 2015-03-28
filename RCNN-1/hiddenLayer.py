@@ -4,7 +4,7 @@ import theano
 import theano.tensor as T
 
 class HiddenLayer(object):
-	def __init__(self,rng,input,n_in,n_out,activation,dropout):
+	def __init__(self,rng,input,n_in,n_out,activation):
 		'''
 		>>>type rng: numpy.random.RandomState
 		>>>para rng: initalize weight randomly
@@ -20,9 +20,6 @@ class HiddenLayer(object):
 
 		>>>type activation: func
 		>>>para activation: the activate function
-
-		>>>type dropout: boolean
-		>>>para dropout: whether or not to use dropout
 		'''
 		self.input=input
 
@@ -47,13 +44,24 @@ class HiddenLayer(object):
 			else activation(raw_output)
 			)
 
-		# if dropout==True:
-		# 	mask_vec=np.asarray(
-		# 		rng.uniform(low=-10,high=10,size=(n_out)),
-		# 		dtype=theano.config.floatX
-		# 		)
-		# 	for i in xrange(n_out):
-		# 		if mask_vec[i]<0:
-		# 			self.output[i]=0
-
 		self.param=[self.w,self.b]
+
+def dropout(rng,value,p):
+	'''
+	>>>dropout function
+	>>>type rng: np.random.RandomState
+	>>>para rng: random seed
+	>>>type value: T.tensor4
+	>>>para value: input value
+	>>>type p: float
+	>>>para p: dropout rate
+	'''
+	srng=T.shared_randomstreams.RandomStreams(rng.randint(2011010539))
+	mask=srng.binomial(n=1,p=1-p,size=value.shape)
+	return value*T.cast(mask,theano.config.floatX)
+
+class DropoutHiddenLayer(HiddenLayer):
+	
+	def __init__(self,rng,input,n_in,n_out,activation,dropoutRate)
+		HiddenLayer.__init__(self,rng,input,n_in,n_out,activation)
+		self.output=dropout(rng,self.output,dropoutRate)

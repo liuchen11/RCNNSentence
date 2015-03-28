@@ -7,7 +7,7 @@ from theano.tensor.signal import downsample
 
 class ConvPool(object):
 
-	def __init__(self, rng, input,shape,filters,pool,dropout):
+	def __init__(self, rng, input,shape,filters,pool):
 		'''
 		>>>type rng: numpy.random.RandomState
 		>>>para rng: initalize weight randomly
@@ -23,9 +23,6 @@ class ConvPool(object):
 
 		>>>type pool: tuple or list of length 2
 		>>>para pool: pooling size
-
-		>>>type dropout: boolean
-		>>>para dropout: whether or not to use dropout
 		'''
 
 		assert filters[1]==shape[1]
@@ -69,16 +66,6 @@ class ConvPool(object):
 			)
 
 		self.output=T.tanh(pool_out+self.b.dimshuffle('x',0,'x','x'))
-		# if dropout==True:
-		# 	shape=self.output.shape
-		# 	self.output=self.output.flatten(1)
-		# 	mask_vec=np.asarray(
-		# 		rng.uniform(low=-10,high=10,size=(self.output.shape[0])),
-		# 		dtype=theano.config.floatX
-		# 		)
-		# 	for i in xrange(self.output.shape[0]):
-		# 		if mask_vec[i]<0:
-		# 			self.output[i]=0
-		# 	self.output=self.output.reshape(shape)
+
 		self.param=[self.w,self.b]
 
