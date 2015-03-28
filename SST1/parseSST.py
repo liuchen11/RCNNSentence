@@ -102,5 +102,5 @@ if __name__=='__main__':
 	SentimentIndex2Label=loadLabels(sentimentLabelFile)
 	Index2SetLabel=loadSetLabel(setLabelFile)
 	sentences,vocab=loadData(Sentence2Index,Index2Sentence,Sentence2SentimentIndex,SentimentIndex2Label,Index2SetLabel)
-	cPickle.dump([sentences,vocab,{'all':[1,2,3],'train':[1],'test':[2],'dev':[3],'cross':False}],open('data','wb'))
+	cPickle.dump([sentences,vocab,{'classes':5,'all':[1,2,3],'train':[1],'test':[2],'dev':[3],'cross':False}],open('data','wb'))
 	print 'data processed'

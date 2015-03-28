@@ -45,5 +45,5 @@ if __name__=='__main__':
 	positiveFile=path+'rt-polarity.pos'
 	negativeFile=path+'rt-polarity.neg'
 	sentences,vocab=loadSentences(positiveFile,negativeFile)
-	cPickle.dump([sentences,vocab,{'all':range(10),'train':[],'test':[],'dev':[],'cross':True}],open('data','wb'))
+	cPickle.dump([sentences,vocab,{'classes':2,'all':range(10),'train':[],'test':[],'dev':[],'cross':True}],open('data','wb'))
 	print 'data processed'
