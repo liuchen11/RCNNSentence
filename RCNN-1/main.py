@@ -77,41 +77,40 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			maxLen=length
 
 	setMatrix={}
-	setLabel={}
+	setClasses={}
 	for subset in sets:
 		setMatrix[subset]=[]
-		setLabel[subset]=[]
+		setClasses[subset]=[]
 
 	for sentence in sentences:
 		vec=parseSentence(sentence['text'],wordIndex,maxLen)
 		setLabel=sentence['setLabel']
 		category=sentence['label']
 		setMatrix[setLabel].append(vec)
-		setLabel[setLabel].append(category)
+		setClasses[setLabel].append(category)
 
 	if cross==False:
-		print 'final minimum precision %f%%'%((1.0-minError)*100)
 		network=model(
 			wordMatrix=vectors,
 			shape=(batchSize,1,maxLen,dimension),
 			filters=(3,4,5),
 			rfilter=(5,1),
-			features=(100),
+			features=(100,),
 			time=4,categories=categories,
 			static=static,
-			dropoutRate=(0.5),
+			dropoutRate=(0.5,),
 			learningRate=0.01
 		)
 
-		trainSet={},trainSetX=[],trainSetY=[]
-		validateSet={},validateSetX=[],validateSetY=[]
-		testSet={},testSetX=[],testSetY=[]
+		trainSet={};trainSetX=[];trainSetY=[]
+		validateSet={};validateSetX=[];validateSetY=[]
+		testSet={};testSetX=[];testSetY=[]
 		for subset in train:
 			trainSetX+=setMatrix[subset]
-			trainSetY+=setLabel[subset]
+			trainSetY+=setClasses[subset]
 		for subset in test:
 			testSetX+=setMatrix[subset]
-			testSetY+=setLabel[subset]
+			testSetY+=setClasses[subset]
 
 
 		if len(trainSetX)%batchSize>0:
@@ -135,7 +134,8 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 		testSet['x']=np.array(testSetX,dtype='int')
 		testSet['y']=np.array(testSetY,dtype='int')
 
-		minError=model.train_validate_test(trainSet,validateSet,testSet)
+		minError=network.train_validate_test(trainSet,validateSet,testSet,10)
+		print 'final minimum precision %f%%'%((1.0-minError)*100)
 	else:
 		minErrors=[]
 		for item in sets:
@@ -144,23 +144,23 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				shape=(batchSize,1,maxLen,dimension),
 				filters=(3,4,5),
 				rfilter=(5,1),
-				features=(100),
+				features=(100,),
 				time=4,categories=categories,
 				static=static,
-				dropoutRate=(0.5),
+				dropoutRate=(0.5,),
 				learningRate=0.01
 			)
 
-			trainSet={},trainSetX=[],trainSetY=[]
-			validateSet={},validateSetX=[],validateSetY=[]
-			testSet={},testSetX=[],testSetY=[]
+			trainSet={};trainSetX=[];trainSetY=[]
+			validateSet={};validateSetX=[];validateSetY=[]
+			testSet={};testSetX=[];testSetY=[]
 			for subset in sets:
 				if item!=subset:
 					trainSetX+=setMatrix[subset]
-					trainSetY+=setLabel[subset]
+					trainSetY+=setClasses[subset]
 				else:
 					testSetX+=setMatrix[subset]
-					testSetY+=setLabel[subset]
+					testSetY+=setClasses[subset]
 
 			if len(trainSetX)%batchSize>0:
 				extraNum=batchSize-len(trainSetX)%batchSize
@@ -183,7 +183,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			testSet['x']=np.array(testSetX,dtype='int')
 			testSet['y']=np.array(testSetY,dtype='int')
 
-			minError=model.train_validate_test(trainSet,validateSet,testSet)
+			minError=network.train_validate_test(trainSet,validateSet,testSet,10)
 			minErrors.append(minError)
 		print 'Final Precision Rate %f%%'%((1.-np.mean(minErrors))*100)
 
@@ -195,6 +195,8 @@ if __name__=='__main__':
 	vecFile=''
 
 	for i in xrange(len(sys.argv)):
+		if i==0:
+			continue
 		if sys.argv[i]=='-d':
 			mode=1
 		elif sys.argv[i]=='-v':
@@ -216,7 +218,7 @@ if __name__=='__main__':
 				elif sys.argv[i]=='-word2vec':
 					rand=False
 				else:
-					raise Error('command line error')
+					raise NotImplementedError('command line error')
 	print 'config: dataFile:%s, vecFile:%s, static:%r, rand:%r'%(dataFile,vecFile,static,rand)
 
 	sentences,vocab,config,vectors,wordIndex=loadDatas(dataFile=dataFile,wordVecFile=vecFile,dimension=300,rand=rand)

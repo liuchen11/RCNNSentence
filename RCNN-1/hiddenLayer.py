@@ -62,6 +62,6 @@ def dropout(rng,value,p):
 
 class DropoutHiddenLayer(HiddenLayer):
 	
-	def __init__(self,rng,input,n_in,n_out,activation,dropoutRate)
+	def __init__(self,rng,input,n_in,n_out,activation,dropoutRate):
 		HiddenLayer.__init__(self,rng,input,n_in,n_out,activation)
 		self.output=dropout(rng,self.output,dropoutRate)

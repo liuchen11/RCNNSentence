@@ -13,16 +13,16 @@ def loadBinVec(fileName,vocab):
 		for line in xrange(vocabSize):
 			word=[]
 			while True:
-				ch=fread(1)
+				ch=fopen.read(1)
 				if ch==' ':
 					word=''.join(word)
 					break
 				else:
 					word.append(ch)
 			if word in vocab:
-				wordVec[word]=np.fromstring(f.read(binaryLen),dtype='float32')
-			else
-				f.read(binaryLen)
+				wordVec[word]=np.fromstring(fopen.read(binaryLen),dtype='float32')
+			else:
+				fopen.read(binaryLen)
 	return layerSize,wordVec
 
 def getWordVec(configFileName,vecFileName):
@@ -34,7 +34,17 @@ def getWordVec(configFileName,vecFileName):
 	for word in data[1]:
 		if word not in wordVec:
 			wordVec[word]=np.random.uniform(-0.25,0.25,dimension)
-	return dimension,wordVec
+
+	vocabSize=len(data[1])
+	vectors=np.zeros(shape=(vocabSize+1,dimension))
+	wordIndex={}
+	vectors[0]=np.zeros(dimension)
+	index=1
+	for word in wordVec:
+		vectors[index]=wordVec[word]
+		wordIndex[word]=index
+		index+=1
+	return vectors,wordIndex
 
 def getRandWordVec(configFileName,dimension):
 	'''
@@ -44,4 +54,14 @@ def getRandWordVec(configFileName,dimension):
 	wordVec={}
 	for word in data[1]:
 		wordVec[word]=np.random.uniform(-0.25,0.25,dimension)
-	return dimension,wordVec
+
+	vocabSize=len(data[1])
+	vectors=np.zeros(shape=(vocabSize+1,dimension))
+	wordIndex={}
+	vectors[0]=np.zeros(dimension)
+	index=1
+	for word in wordVec:
+		vectors[index]=wordVec[word]
+		wordIndex[word]=index
+		index+=1
+	return vectors,wordIndex
