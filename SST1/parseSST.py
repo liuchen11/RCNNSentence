@@ -84,7 +84,7 @@ def loadData(Sentence2Index,Index2Sentence,Sentence2SentimentIndex,SentimentInde
 		label=SentimentIndex2Label[sentimentIndex]
 		setLabel=Index2SetLabel[index]
 		clean=cleanStr(sentence)
-		words=set(clean)
+		words=set(clean.split())
 		for word in words:
 			vocab[word]+=1
 		sentences.append({'label':label,'text':clean.split(),'setLabel':setLabel,'len':len(clean.split())})
