@@ -138,14 +138,14 @@ def model(object):
 		[index,learnRate],cost,updates=self.update,
 		givens={
 		self.lr:learnRate,
-		self.x:trainSet{'x'}[index*self.batchSize:(index+1)*self.batchSize],
-		self.y:trainSet{'y'}[index*self.batchSize:(index+1)*self.batchSize]})
+		self.x:trainSet['x'][index*self.batchSize:(index+1)*self.batchSize],
+		self.y:trainSet['y'][index*self.batchSize:(index+1)*self.batchSize]})
 
 		validateModel=theano.function(
 		[index],errors,
 		givens={
-		self.x:validateSet{'x'}[index*self.batchSize:(index+1)*self.batchSize],
-		self.y:validateSet{'y'}[index*self.batchSize:(index+1)*self.batchSize]})
+		self.x:validateSet['x'][index*self.batchSize:(index+1)*self.batchSize],
+		self.y:validateSet['y'][index*self.batchSize:(index+1)*self.batchSize]})
 
 		testLayer0Output=[]
 		testLayer0Input=self.wordVec[T.cast(testMatrix.flatten(),dtype='int32')].reshape(testSize,1,self.sentenceLen,self.dimension)
@@ -182,11 +182,12 @@ def model(object):
 				for i in xrange(validateBatches)
 			]
 			validatePrecision=1-np.mean(validateError)
-			testError=testModel(testSet{'x'},testSet{'y'})
+			testError=testModel(testSet['x'],testSet['y'])
 			testPrecision=1-testError
 			minError=min(minError,testError)
 
 			print 'epoch=%i, validate precision %f%%, test precision %f%%'%(epoch,validatePrecision,testPrecision)
 			print 'minError=%f%%'%(minError)
-			
+
+		return minError
 
