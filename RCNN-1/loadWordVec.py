@@ -1,4 +1,5 @@
 import cPickle
+import theano
 import numpy as np
 
 def loadBinVec(fileName,vocab):

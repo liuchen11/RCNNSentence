@@ -2,6 +2,7 @@ import cPickle
 import numpy as np
 import theano
 import theano.tensor as T
+from collections import defaultdict, OrderedDict
 
 from loadWordVec import *
 from hiddenLayer import *
@@ -12,6 +13,57 @@ from recurrentConvLayer import *
 
 def ReLU(x):
 	return T.switch(x<0,0,x)
+
+def as_floatX(variable):
+	if isinstance(variable,float) or isinstance(variable,np.ndarray):
+		return np.cast[theano.config.floatX](variable)
+	return T.cast(variable,theano.config.floatX)
+
+def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
+	'''
+	>>>
+
+	>>>type params: tuple or list
+	>>>para params: parameters
+	>>>type cost:
+	>>>para cost:
+	>>>type rho: float
+	>>>para rho:
+	>>>type epsilon: float
+	>>>para epsilon:
+	>>>type norm_lim: int
+	>>>para norm_lim:
+	'''
+	updates=OrderedDict({})
+	exp_sqr_grads=OrderedDict({})
+	exp_sqr_update=OrderedDict({})
+	g_params=[]
+	for param in params:
+		empty=np.zeros_like(param.get_value())
+		exp_sqr_grads[param]=theano.shared(value=as_floatX(empty),name='exp_grad_%s'%param.name)
+		exp_sqr_update[param]=theano.shared(value=as_floatX(empty),name='exp_grad_%s'%param.name)
+		gp=T.grad(cost,param)
+		g_params.append(gp)
+	for param,gp in zip(params,g_params):
+		exp_sg=exp_sqr_grads[param]
+		exp_su=exp_sqr_update[param]
+		update_exp_sg=rho*exp_sg+(1-rho)*T.sqr(gp)#????
+		updates[exp_sg]=update_exp_sg
+		
+		step=-(T.sqrt(exp_su+epsilon)/T.sqrt(update_exp_sg+epsilon))*gp		
+		stepped_param=param+step
+
+		update_exp_su=rho*exp_su+(1-rho)*T.sqr(step)
+		updates[exp_su]=update_exp_su
+
+		if param.get_value(borrow=True).ndim==2 and param.name!='wordVec':
+			col_norms=T.sqrt(T.sum(T.sqr(stepped_param),axis=0))
+			desired_norms=T.clip(col_norms,0,T.sqrt(norm_lim))#???
+			scale=desired_norms/(1e-7+col_norms)
+			updates[param]=stepped_param*scale
+		else:
+			updates[param]=stepped_param
+	return updates
 
 class model(object):
 	
@@ -51,12 +103,12 @@ class model(object):
 		poolSizes=[]
 		for filter in filters:
 			filterSizes.append([features[0],featureMaps,filter,self.dimension])
-			poolSizes.append([self.sentenceLen-filter+1,self.dimension])
+			poolSizes.append([self.sentenceLen-filter+1,1])
 
 		#build up the model
 		self.x=T.matrix('x')		#batch sentences
 		self.y=T.ivector('y')		#output labels
-		self.lr=T.scalar('lr')
+		self.lr=T.dscalar('lr')
 
 		self.wordVec=theano.shared(wordMatrix,name='wordVec')
 
@@ -97,19 +149,20 @@ class model(object):
 		)
 
 		self.cost=self.layer1.negative_log_likelyhood(self.y)
-		self.error=self.layer1.errors(self.y)
+		self.errors=self.layer1.errors(self.y)
 
 		self.params=self.layer1.param
 		for layer in self.layers0:
 			self.params+=layer.param
 		if static==False:
-			self.params+=self.wordVec
+			self.params+=[self.wordVec]
 
 		grads=T.grad(self.cost,self.params)
 		self.update=[
 			(paramI,paramI-gradI*self.lr)
 			for (paramI,gradI) in zip(self.params,grads)
 		]
+		self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost)
 
 		print 'the model constructed!'
 
@@ -128,10 +181,13 @@ class model(object):
 		testSize=testSet['x'].shape[0]
 		trainX=theano.shared(trainSet['x'],borrow=True)
 		trainY=theano.shared(trainSet['y'],borrow=True)
+		trainY=T.cast(trainY,'int32')
 		validateX=theano.shared(validateSet['x'],borrow=True)
 		validateY=theano.shared(validateSet['y'],borrow=True)
+		validateY=T.cast(validateY,'int32')
 		testX=theano.shared(testSet['x'],borrow=True)
 		testY=theano.shared(testSet['y'],borrow=True)
+		testY=T.cast(testY,'int32')
 		trainBatches=trainSize/self.batchSize
 		validateBatches=validateSize/self.batchSize
 
@@ -141,20 +197,21 @@ class model(object):
 		learnRate=T.scalar('lr')
 
 		trainModel=theano.function(
-		[index,learnRate],self.cost,updates=self.update,
+		[index],self.cost,updates=self.adadeltaUpdate,
 		givens={
-		self.lr:learnRate,
 		self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
 		self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]})
+		print 'training model constructed!'
 
 		validateModel=theano.function(
 		[index],self.errors,
 		givens={
 		self.x:validateX[index*self.batchSize:(index+1)*self.batchSize],
 		self.y:validateY[index*self.batchSize:(index+1)*self.batchSize]})
+		print 'validation model constructed!'
 
 		testLayer0Output=[]
-		testLayer0Input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape(testSize,1,self.sentenceLen,self.dimension)
+		testLayer0Input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape((testSize,1,self.sentenceLen,self.dimension))
 		for layer in self.layers0:
 			output=layer.process(testLayer0Input,testSize)
 			testLayer0Output.append(output)
@@ -162,6 +219,7 @@ class model(object):
 		testPredict=self.layer1.predict(testLayer1Input)
 		testError=T.mean(T.neq(testPredict,y))
 		testModel=theano.function([x,y],testError)
+		print 'testing model constructed!'
 
 		epoch=0
 		iteration=0
@@ -181,7 +239,7 @@ class model(object):
 				rate=0.001
 
 			for minBatch in np.random.permutation(range(trainBatches)):
-				cost=trainModel(minBatch,rate)				#set zero func
+				cost=trainModel(minBatch)				#set zero func
 
 			validateError=[
 				validateModel(i)

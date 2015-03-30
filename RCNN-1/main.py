@@ -1,8 +1,10 @@
-import sys
+import sys,warnings
 import numpy as np
 
 from model import *
 from loadWordVec import *
+
+warnings.filterwarnings('ignore')
 
 def parseSentence(text,wordIndex,maxLen):
 	'''
@@ -96,7 +98,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			filters=(3,4,5),
 			rfilter=(5,1),
 			features=(100,),
-			time=4,categories=categories,
+			time=5,categories=categories,
 			static=static,
 			dropoutRate=(0.5,),
 			learningRate=0.01
@@ -127,12 +129,12 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			validateSetX.append(trainSetX[validateIndex[i]])
 			validateSetY.append(trainSetY[validateIndex[i]])
 
-		trainSet['x']=np.array(trainSetX,dtype='int')
-		trainSet['y']=np.array(trainSetY,dtype='int')
-		validateSet['x']=np.array(validateSetX,dtype='int')
-		validateSet['y']=np.array(validateSetY,dtype='int')
-		testSet['x']=np.array(testSetX,dtype='int')
-		testSet['y']=np.array(testSetY,dtype='int')
+		trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
+		trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
+		validateSet['x']=np.array(validateSetX,dtype=theano.config.floatX)
+		validateSet['y']=np.array(validateSetY,dtype=theano.config.floatX)
+		testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
+		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
 		minError=network.train_validate_test(trainSet,validateSet,testSet,10)
 		print 'final minimum precision %f%%'%((1.0-minError)*100)
@@ -145,7 +147,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				filters=(3,4,5),
 				rfilter=(5,1),
 				features=(100,),
-				time=4,categories=categories,
+				time=1,categories=categories,
 				static=static,
 				dropoutRate=(0.5,),
 				learningRate=0.01
@@ -176,12 +178,12 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				validateSetX.append(trainSetX[validateIndex[i]])
 				validateSetY.append(trainSetY[validateIndex[i]])
 
-			trainSet['x']=np.array(trainSetX,dtype='int')
-			trainSet['y']=np.array(trainSetY,dtype='int')
-			validateSet['x']=np.array(validateSetX,dtype='int')
-			validateSet['y']=np.array(validateSetY,dtype='int')
-			testSet['x']=np.array(testSetX,dtype='int')
-			testSet['y']=np.array(testSetY,dtype='int')
+			trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
+			trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
+			validateSet['x']=np.array(validateSetX,dtype=theano.config.floatX)
+			validateSet['y']=np.array(validateSetY,dtype=theano.config.floatX)
+			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
+			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
 			minError=network.train_validate_test(trainSet,validateSet,testSet,10)
 			minErrors.append(minError)
