@@ -87,7 +87,7 @@ def loadData(Sentence2Index,Index2Sentence,Sentence2SentimentIndex,SentimentInde
 		words=set(clean)
 		for word in words:
 			vocab[word]+=1
-		sentences.append({'label':label,'text':clean,'setLabel':setLabel,'len':len(clean)})
+		sentences.append({'label':label,'text':clean.split(),'setLabel':setLabel,'len':len(clean.split())})
 	return sentences,vocab
 
 path='./'

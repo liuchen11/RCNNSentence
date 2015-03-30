@@ -29,14 +29,14 @@ def loadSentences(positiveFile,negativeFile):
 			words=set(clean.split())
 			for word in words:
 				vocab[word]+=1
-			sentences.append({'label':0,'text':clean,'setLabel':np.random.randint(0,10),'len':len(clean)})
+			sentences.append({'label':0,'text':clean.split(),'setLabel':np.random.randint(0,10),'len':len(clean.split())})
 	with open(negativeFile,'r') as fopen:
 		for line in fopen:
 			clean=cleanStr(line)
 			words=set(clean.split())
 			for word in words:
 				vocab[word]+=1
-			sentences.append({'label':1,'text':clean,'setLabel':np.random.randint(0,10),'len':len(clean)})
+			sentences.append({'label':1,'text':clean.split(),'setLabel':np.random.randint(0,10),'len':len(clean.split())})
 	return sentences,vocab
 
 path='./'
