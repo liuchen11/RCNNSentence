@@ -214,9 +214,9 @@ class model(object):
 		testLayer0Input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape((testSize,1,self.sentenceLen,self.dimension))
 		for layer in self.layers0:
 			output=layer.process(testLayer0Input,testSize)
-			testLayer0Output.append(output)
+			testLayer0Output.append(output.flatten(2))
 		testLayer1Input=T.concatenate(testLayer0Output,1)
-		testPredict=self.layer1.predict(testLayer1Input)
+		testPredict=self.layer1.predictInstance(testLayer1Input)
 		testError=T.mean(T.neq(testPredict,y))
 		testModel=theano.function([x,y],testError)
 		print 'testing model constructed!'

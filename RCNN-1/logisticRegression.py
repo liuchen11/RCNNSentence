@@ -50,3 +50,12 @@ class LogisticRegression(object):
 		'''
 		return T.mean(T.neq(self.predict,y))
 
+	def predictInstance(self,data):
+		'''
+		>>>calculate new data
+
+		>>>type data:T.tensor4
+		>>>para data:newly come data
+		'''
+		return softmax(T.dot(data,self.w)+self.b)
+		

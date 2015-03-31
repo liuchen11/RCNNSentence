@@ -73,11 +73,9 @@ class RecurrentConvLayer(object):
 		assert filters[0]==rfilter[0]
 		assert rfilter[0]==rfilter[1]
 		self.input=input
-		self.filters=filters
-		self.rfilter=rfilter
-		self.shape=shape
-		self.time=time
-		self.pool=pool
+		self.filters=filters;self.rfilter=rfilter
+		self.shape=shape;self.time=time;self.pool=pool
+		self.alpha=alpha;self.beta=beta;self.N=N
 		layer_size=(shape[0],filters[0],shape[2]-filters[2]+1,shape[3]-filters[3]+1)
 
 		inflow=np.prod(filters[1:])
@@ -166,9 +164,9 @@ class RecurrentConvLayer(object):
 			norm=NormLayer(
 				input=state,
 				shape=layer_size,
-				alpha=alpha,
-				beta=beta,
-				N=N
+				alpha=self.alpha,
+				beta=self.beta,
+				N=self.N
 			)
 			state=norm.output
 
