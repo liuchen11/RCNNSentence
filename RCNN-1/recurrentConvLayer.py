@@ -91,7 +91,7 @@ class RecurrentConvLayer(object):
 
 		b_init=np.zeros(shape=filters[0],dtype=theano.config.floatX)
 		self.b=theano.shared(value=b_init,name='b_in')
-		b_r_init=np.zeros(shape=layer_size,dtype=theano.config.floatX)
+		b_r_init=np.zeros(shape=rfilter[0],dtype=theano.config.floatX)
 		self.b_r=theano.shared(value=b_r_init,name='b_r')
 
 		conv_input=conv.conv2d(
@@ -103,7 +103,7 @@ class RecurrentConvLayer(object):
 
 		print 'initialize the weight'
 
-		state=conv_input+self.b_r
+		state=conv_input+self.b_r.dimshuffle('x',0,'x','x')
 		for i in xrange(time):
 			padded_input=TensorPadding(TensorPadding(input=state,width=rfilter[2]-1,axis=2),width=rfilter[3]-1,axis=3)
 			conv_recurrent=conv.conv2d(
@@ -151,7 +151,7 @@ class RecurrentConvLayer(object):
 			image_shape=shape
 		)
 
-		state=conv_input+self.b_r
+		state=conv_input+self.b_r.dimshuffle('x',0,'x','x')
 		for i in xrange(self.time):
 			padded_input=TensorPadding(TensorPadding(input=state,width=self.rfilter[2]-1,axis=2),width=self.rfilter[3]-1,axis=3)
 			conv_recurrent=conv.conv2d(
@@ -161,14 +161,14 @@ class RecurrentConvLayer(object):
 				image_shape=[layer_size[0],layer_size[1],layer_size[2]+self.rfilter[2]-1,layer_size[3]+self.rfilter[3]-1]
 			)
 			state=ReLU(conv_input+conv_recurrent)
-			norm=NormLayer(
-				input=state,
-				shape=layer_size,
-				alpha=self.alpha,
-				beta=self.beta,
-				N=self.N
-			)
-			state=norm.output
+#			norm=NormLayer(
+#				input=state,
+#				shape=layer_size,
+#				alpha=self.alpha,
+#				beta=self.beta,
+#				N=self.N
+#			)
+#			state=norm.output
 
 		pool_out=downsample.max_pool_2d(
 			input=state,

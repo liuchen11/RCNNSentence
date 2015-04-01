@@ -185,6 +185,8 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
+			cPickle.dump([trainSet,validateSet,testSet],open('save','wb'))
+
 			minError=network.train_validate_test(trainSet,validateSet,testSet,10)
 			minErrors.append(minError)
 		print 'Final Precision Rate %f%%'%((1.-np.mean(minErrors))*100)

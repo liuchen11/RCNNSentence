@@ -185,9 +185,8 @@ class model(object):
 		validateX=theano.shared(validateSet['x'],borrow=True)
 		validateY=theano.shared(validateSet['y'],borrow=True)
 		validateY=T.cast(validateY,'int32')
-		testX=theano.shared(testSet['x'],borrow=True)
-		testY=theano.shared(testSet['y'],borrow=True)
-		testY=T.cast(testY,'int32')
+		testX=testSet['x']
+		testY=np.asarray(testSet['y'],'int32')
 		trainBatches=trainSize/self.batchSize
 		validateBatches=validateSize/self.batchSize
 
@@ -217,8 +216,8 @@ class model(object):
 			testLayer0Output.append(output.flatten(2))
 		testLayer1Input=T.concatenate(testLayer0Output,1)
 		testPredict=self.layer1.predictInstance(testLayer1Input)
-		testError=T.mean(T.neq(testPredict,y))
-		testModel=theano.function([x,y],testError)
+		testError=T.mean(T.neq(testPredict,self.y))
+		testModel=theano.function([self.x,self.y],testError)
 		print 'testing model constructed!'
 
 		epoch=0
@@ -239,12 +238,14 @@ class model(object):
 				rate=0.001
 
 			for minBatch in np.random.permutation(range(trainBatches)):
+				print 'training %i/%i'%(minBatch,trainBatches)
 				cost=trainModel(minBatch)				#set zero func
 
 			validateError=[
 				validateModel(i)
 				for i in xrange(validateBatches)
 			]
+			print 'testing...'
 			validatePrecision=1-np.mean(validateError)
 			testError=testModel(testX,testY)
 			testPrecision=1-testError
