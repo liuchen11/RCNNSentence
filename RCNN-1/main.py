@@ -5,6 +5,7 @@ from model import *
 from loadWordVec import *
 
 warnings.filterwarnings('ignore')
+sys.setrecursionlimit(40000)
 
 def parseSentence(text,wordIndex,maxLen):
 	'''
@@ -67,6 +68,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 	categories=config['classes']
 	sets=config['all']
 	train=config['train']
+	validation=config['dev']
 	test=config['test']
 	cross=config['cross']
 	dimension=len(vectors[0])
@@ -110,10 +112,27 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 		for subset in train:
 			trainSetX+=setMatrix[subset]
 			trainSetY+=setClasses[subset]
+		for subset in validation:
+			validationSetX+=setMatrix[subset]
+			validationSetY+=setClasses[subset]
 		for subset in test:
 			testSetX+=setMatrix[subset]
 			testSetY+=setClasses[subset]
 
+		if len(validation)==0:				#No ValidationSet
+			newTrainSetX=[];newValidationSetX=[]
+			newTrainSetY=[];newValidationSetY=[]
+			index=0
+			for i in np.random.permutation(range(len(trainSetX))):
+				if index<len(trainSetX)*0.9:
+					newTrainSetX.append(trainSetX[i])
+					newTrainSetY.append(trainSetY[i])
+				else:
+					newValidationSetX.append(trainSetX[i])
+					newValidationSetY.append(trainSetY[i])
+			trainSetX=newTrainSetX;validationSetX=newValidationSetX
+			trainSetY=newTrainSetY;validationSetY=newValidationSetY
+				
 
 		if len(trainSetX)%batchSize>0:
 			extraNum=batchSize-len(trainSetX)%batchSize
@@ -122,12 +141,19 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				trainSetX.append(trainSetX[extraIndex[i]])
 				trainSetY.append(trainSetY[extraIndex[i]])
 
-		trainSize=len(trainSetX)
-		validateSize=trainSize/5-(trainSize/5)%batchSize
-		validateIndex=np.random.permutation(range(trainSize))
-		for i in xrange(validateSize):
-			validateSetX.append(trainSetX[validateIndex[i]])
-			validateSetY.append(trainSetY[validateIndex[i]])
+		if len(validationSetX)%batchSize>0:
+			extraNum=batchSize-len(validationSetX)%batchSize
+			extraIndex=np.random.permutation(range(len(validationSetX)))
+			for i in xrange(extraNum):
+				validationSetX.append(validationSetX[extraIndex[i]])
+				validationSetY.append(validationSetY[extraIndex[i]])
+
+		#trainSize=len(trainSetX)
+		#validateSize=trainSize/5-(trainSize/5)%batchSize
+		#validateIndex=np.random.permutation(range(trainSize))
+		#for i in xrange(validateSize):
+		#	validateSetX.append(trainSetX[validateIndex[i]])
+		#	validateSetY.append(trainSetY[validateIndex[i]])
 
 		trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
 		trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
@@ -164,6 +190,21 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 					testSetX+=setMatrix[subset]
 					testSetY+=setClasses[subset]
 
+			#No ValidationSet
+			newTrainSetX=[];newValidationSetX=[]
+			newTrainSetY=[];newValidationSetY=[]
+			index=0
+			for i in np.random.permutation(range(len(trainSetX))):
+				if index<len(trainSetX)*0.9:
+					newTrainSetX.append(trainSetX[i])
+					newTrainSetY.append(trainSetY[i])
+				else:
+					newValidationSetX.append(trainSetX[i])
+					newValidationSetY.append(trainSetY[i])
+			trainSetX=newTrainSetX;validationSetX=newValidationSetX
+			trainSetY=newTrainSetY;validationSetY=newValidationSetY
+
+
 			if len(trainSetX)%batchSize>0:
 				extraNum=batchSize-len(trainSetX)%batchSize
 				extraIndex=np.random.permutation(range(len(trainSetX)))
@@ -171,12 +212,12 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 					trainSetX.append(trainSetX[extraIndex[i]])
 					trainSetY.append(trainSetY[extraIndex[i]])
 
-			trainSize=len(trainSetX)
-			validateSize=trainSize/5-(trainSize/5)%batchSize
-			validateIndex=np.random.permutation(range(trainSize))
-			for i in xrange(validateSize):
-				validateSetX.append(trainSetX[validateIndex[i]])
-				validateSetY.append(trainSetY[validateIndex[i]])
+			if len(validationSetX)%batchSize>0:
+				extraNum=batchSize-len(validationSetX)%batchSize
+				extraIndex=np.random.permutation(range(len(validationSetX)))
+				for i in xrange(extraNum):
+					validationSetX.append(validationSetX[extraIndex[i]])
+					validationSetY.append(validationSetY[extraIndex[i]])
 
 			trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
 			trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)

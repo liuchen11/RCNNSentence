@@ -1,4 +1,4 @@
-import cPickle
+import cPickle,sys
 import numpy as np
 import theano
 import theano.tensor as T
@@ -10,6 +10,8 @@ from convLayer import *
 from logisticRegression import *
 from normLayer import *
 from recurrentConvLayer import *
+
+sys.setrecursionlimit(40000)
 
 def ReLU(x):
 	return T.switch(x<0,0,x)
@@ -225,34 +227,33 @@ class model(object):
 		maxIteration=10000
 		minError=1.0
 		rate=0.01
+		bestValPrecision=0.0
+		finalPrecision=0.0
 
 		while epoch<nEpoch and iteration<maxIteration:
 			epoch+=1
-			if minError>0.25:
-				rate=0.01
-			elif minError>0.2:
-				rate=0.005
-			elif minError>0.25:
-				rate=0.002
-			else:
-				rate=0.001
-
+			num=0
 			for minBatch in np.random.permutation(range(trainBatches)):
-				print 'training %i/%i'%(minBatch,trainBatches)
+				print 'training %i/%i\r'%(num,trainBatches),
 				cost=trainModel(minBatch)				#set zero func
+				num+=1
 
+			print ''
 			validateError=[
 				validateModel(i)
 				for i in xrange(validateBatches)
 			]
-			print 'testing...'
 			validatePrecision=1-np.mean(validateError)
-			testError=testModel(testX,testY)
-			testPrecision=1-testError
-			minError=min(minError,testError)
+			print 'epoch=%i,validation precision=%f%%'%(epoch,validatePrecision)
+			if validatePrecision>bestValPrecision:
+				print 'testing...'
+				testError=testModel(testX,testY)
+				testPrecision=1-testError
+				print 'testing precision=%f%%'%testPrecision
+				finalPrecision=testPrecision
+				minError=min(minError,testError)
 
-			print 'epoch=%i, validate precision %f%%, test precision %f%%'%(epoch,validatePrecision,testPrecision)
 			print 'minError=%f%%'%(minError)
 
-		return minError
+		return finalPrecision
 

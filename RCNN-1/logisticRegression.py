@@ -57,5 +57,6 @@ class LogisticRegression(object):
 		>>>type data:T.tensor4
 		>>>para data:newly come data
 		'''
-		return softmax(T.dot(data,self.w)+self.b)
+		p=softmax(T.dot(data,self.w)+self.b)
+		return T.argmax(p,axis=1)
 		
