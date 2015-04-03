@@ -2,6 +2,7 @@ import sys,warnings
 import numpy as np
 
 from cnnModel import *
+from rcnnModel import *
 from loadWordVec import *
 
 warnings.filterwarnings('ignore')
@@ -151,7 +152,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 		testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-		network=CNNModel(
+		network=RCNNModel(
 			wordMatrix=vectors,
 			shape=(batchSize,1,maxLen,dimension),
 			filters=(3,4,5),
@@ -163,10 +164,11 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			learningRate=0.01
 		)
 
-		minError=network.train_validate_test(trainSet,validateSet,testSet,10)
-		print 'final minimum precision %f%%'%((1.0-minError)*100)
+		precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+		network.save()
+		print 'Final Precision Rate %f%%'%(precision*100.)
 	else:
-		minErrors=[]
+		precisions=[]
 		for item in sets:
 			trainSet={};trainSetX=[];trainSetY=[]
 			validateSet={};validationSetX=[];validationSetY=[]
@@ -216,7 +218,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-			network=CNNModel(
+			network=RCNNModel(
 				wordMatrix=vectors,
 				shape=(batchSize,1,maxLen,dimension),
 				filters=(3,4,5),
@@ -228,9 +230,10 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				learningRate=0.01
 			)
 
-			minError=network.train_validate_test(trainSet,validateSet,testSet,10)
-			minErrors.append(minError)
-		print 'Final Precision Rate %f%%'%((1.-np.mean(minErrors))*100)
+			precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+			network.save()
+			precisions.append(precision)
+		print 'Final Precision Rate %f%%'%(np.mean(precisions)*100.)
 
 if __name__=='__main__':
 	static=False

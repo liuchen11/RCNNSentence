@@ -173,14 +173,14 @@ class RecurrentConvLayer(object):
 				image_shape=[layer_size[0],layer_size[1],layer_size[2]+self.rfilter[2]-1,layer_size[3]+self.rfilter[3]-1]
 			)
 			state=ReLU(conv_input+conv_recurrent)
-#			norm=NormLayer(
-#				input=state,
-#				shape=layer_size,
-#				alpha=self.alpha,
-#				beta=self.beta,
-#				N=self.N
-#			)
-#			state=norm.output
+			norm=NormLayer(
+				input=state,
+				shape=layer_size,
+				alpha=self.alpha,
+				beta=self.beta,
+				N=self.N
+			)
+			state=norm.output
 
 		pool_out=downsample.max_pool_2d(
 			input=state,
