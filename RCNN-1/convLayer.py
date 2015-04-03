@@ -84,14 +84,14 @@ class ConvPool(object):
 		shape=(batchSize,1,self.shape[2],self.shape[3])
 
 		conv_out=conv.conv2d(
-			input=input,
+			input=data,
 			filters=self.w,
 			filter_shape=self.filters,
 			image_shape=shape
 		)
 		pool_out=downsample.max_pool_2d(
 			input=conv_out,
-			ds=pool,
+			ds=self.pool,
 			ignore_border=True
 		)
 		output=T.tanh(pool_out+self.b.dimshuffle('x',0,'x','x'))

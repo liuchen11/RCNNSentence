@@ -30,10 +30,12 @@ def getWordVec(configFileName,vecFileName):
 	'''
 	>>>load wordvecs and initialize unknow word's vector randomly
 	'''
+	num=0
 	data=cPickle.load(open(configFileName,'rb'))
 	dimension,wordVec=loadBinVec(vecFileName,data[1])
 	for word in data[1]:
 		if word not in wordVec:
+			num+=1
 			wordVec[word]=np.random.uniform(-0.25,0.25,dimension)
 
 	vocabSize=len(data[1])
@@ -45,6 +47,7 @@ def getWordVec(configFileName,vecFileName):
 		vectors[index]=wordVec[word]
 		wordIndex[word]=index
 		index+=1
+	print 'word not found: ',num
 	return vectors,wordIndex
 
 def getRandWordVec(configFileName,dimension):

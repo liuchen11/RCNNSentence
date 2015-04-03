@@ -129,7 +129,7 @@ class RecurrentConvLayer(object):
 		)
 		self.output=pool_out+self.b.dimshuffle('x',0,'x','x')
 		self.param=[self.w_in,self.w_r,self.b,self.b_r]
-		
+
 		print 'recurrentconvlayer constructed!'
 
 	def process(self,data,batchSize):

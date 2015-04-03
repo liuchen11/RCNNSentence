@@ -1,7 +1,7 @@
 import sys,warnings
 import numpy as np
 
-from model import *
+from cnnModel import *
 from loadWordVec import *
 
 warnings.filterwarnings('ignore')
@@ -94,20 +94,8 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 		setClasses[setLabel].append(category)
 
 	if cross==False:
-		network=model(
-			wordMatrix=vectors,
-			shape=(batchSize,1,maxLen,dimension),
-			filters=(3,4,5),
-			rfilter=(5,1),
-			features=(100,),
-			time=5,categories=categories,
-			static=static,
-			dropoutRate=(0.5,),
-			learningRate=0.01
-		)
-
 		trainSet={};trainSetX=[];trainSetY=[]
-		validateSet={};validateSetX=[];validateSetY=[]
+		validateSet={};validationSetX=[];validationSetY=[]
 		testSet={};testSetX=[];testSetY=[]
 		for subset in train:
 			trainSetX+=setMatrix[subset]
@@ -130,6 +118,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				else:
 					newValidationSetX.append(trainSetX[i])
 					newValidationSetY.append(trainSetY[i])
+				index+=1
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 				
@@ -157,30 +146,30 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 
 		trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
 		trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
-		validateSet['x']=np.array(validateSetX,dtype=theano.config.floatX)
-		validateSet['y']=np.array(validateSetY,dtype=theano.config.floatX)
+		validateSet['x']=np.array(validationSetX,dtype=theano.config.floatX)
+		validateSet['y']=np.array(validationSetY,dtype=theano.config.floatX)
 		testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
+
+		network=CNNModel(
+			wordMatrix=vectors,
+			shape=(batchSize,1,maxLen,dimension),
+			filters=(3,4,5),
+			rfilter=(5,1),
+			features=(100,),
+			time=5,categories=categories,
+			static=static,
+			dropoutRate=(0.5,),
+			learningRate=0.01
+		)
 
 		minError=network.train_validate_test(trainSet,validateSet,testSet,10)
 		print 'final minimum precision %f%%'%((1.0-minError)*100)
 	else:
 		minErrors=[]
 		for item in sets:
-			network=model(
-				wordMatrix=vectors,
-				shape=(batchSize,1,maxLen,dimension),
-				filters=(3,4,5),
-				rfilter=(5,1),
-				features=(100,),
-				time=1,categories=categories,
-				static=static,
-				dropoutRate=(0.5,),
-				learningRate=0.01
-			)
-
 			trainSet={};trainSetX=[];trainSetY=[]
-			validateSet={};validateSetX=[];validateSetY=[]
+			validateSet={};validationSetX=[];validationSetY=[]
 			testSet={};testSetX=[];testSetY=[]
 			for subset in sets:
 				if item!=subset:
@@ -201,6 +190,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 				else:
 					newValidationSetX.append(trainSetX[i])
 					newValidationSetY.append(trainSetY[i])
+				index+=1
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 
@@ -221,12 +211,22 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static):
 
 			trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
 			trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
-			validateSet['x']=np.array(validateSetX,dtype=theano.config.floatX)
-			validateSet['y']=np.array(validateSetY,dtype=theano.config.floatX)
+			validateSet['x']=np.array(validationSetX,dtype=theano.config.floatX)
+			validateSet['y']=np.array(validationSetY,dtype=theano.config.floatX)
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-			cPickle.dump([trainSet,validateSet,testSet],open('save','wb'))
+			network=CNNModel(
+				wordMatrix=vectors,
+				shape=(batchSize,1,maxLen,dimension),
+				filters=(3,4,5),
+				rfilter=(5,1),
+				features=(100,),
+				time=1,categories=categories,
+				static=static,
+				dropoutRate=(0.5,),
+				learningRate=0.01
+			)
 
 			minError=network.train_validate_test(trainSet,validateSet,testSet,10)
 			minErrors.append(minError)
