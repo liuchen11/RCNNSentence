@@ -17,11 +17,21 @@ class NormLayer(object):
 		>>>para alpha/beta/N: normalization factors
 		'''
 		
-		tmp=input.dimshuffle(1,0,2,3)
-		self.output=T.zeros_like(tmp)
-		for k in xrange(shape[1]):
-			result=T.sum(T.square(tmp[k-N/2:k+N/2]),axis=0)
-			norm=(1.0+alpha/N*result)**beta
-			self.output=T.set_subtensor(self.output[k],tmp[k]/norm)
-		self.output=self.output.dimshuffle(1,0,2,3)
-		
+		#tmp=input.dimshuffle(1,0,2,3)
+		#self.output=T.zeros_like(tmp)
+		#for k in xrange(shape[1]):
+		#	result=T.sum(T.square(tmp[k-N/2:k+N/2]),axis=0)
+		#	norm=(1.0+alpha/N*result)**beta
+		#	self.output=T.set_subtensor(self.output[k],tmp[k]/norm)
+		#self.output=self.output.dimshuffle(1,0,2,3)
+
+		half=N//2
+		sq=T.sqr(input)
+		batchSize,features,height,width=shape
+		extra_channels=T.alloc(0.,batchSize+2*half,features,height,width)
+		sq=T.set_subtensor(extra_channels[half:half+batchSize,:,:,:], sq)
+		scale=1
+		for i in xrange(N):
+			scale+=alpha*sq[i:i+batchSize,:,:,:]
+		scale=scale**beta
+		self.output=input/scale
