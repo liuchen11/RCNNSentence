@@ -23,20 +23,30 @@ def cleanStr(string):
 def loadSentences(positiveFile,negativeFile):
 	sentences=[]
 	vocab=defaultdict(float)
+	poslines=[];neglines=[]
 	with open(positiveFile,'r') as fopen:
 		for line in fopen:
-			clean=cleanStr(line)
-			words=set(clean.split())
-			for word in words:
-				vocab[word]+=1
-			sentences.append({'label':0,'text':clean.split(),'setLabel':np.random.randint(0,10),'len':len(clean.split())})
+			poslines.append(line)
+	posNum=len(poslines)
+	rand=np.random.permutation(range(posNum))
+	for i in xrange(posNum):
+		clean=cleanStr(poslines[rand[i]])
+		words=set(clean.split())
+		for word in words:
+			vocab[word]+=1
+		sentences.append({'label':0,'text':clean.split(),'setLabel':i%10,'len':len(clean.split())})
+
 	with open(negativeFile,'r') as fopen:
 		for line in fopen:
-			clean=cleanStr(line)
-			words=set(clean.split())
-			for word in words:
-				vocab[word]+=1
-			sentences.append({'label':1,'text':clean.split(),'setLabel':np.random.randint(0,10),'len':len(clean.split())})
+			neglines.append(line)
+	negNum=len(neglines)
+	rand=np.random.permutation(range(negNum))
+	for i in xrange(negNum):
+		clean=cleanStr(neglines[rand[i]])
+		words=set(clean.split())
+		for word in words:
+			vocab[word]+=1
+		sentences.append({'label':1,'text':clean.split(),'setLabel':i%10,'len':len(clean.split())})
 	return sentences,vocab
 
 path='./'
