@@ -146,7 +146,7 @@ class RecurrentConvLayer(object):
 				image_shape=layer_size,
 				border_mode='full'
 			)
-			state=ReLU(conv_input+conv_recurrent[:,:,axis2Padleft,axis2Padright,axis3Padleft,axis3Padright])
+			state=ReLU(conv_input+conv_recurrent[:,:,axis2Padleft:axis2Padright,axis3Padleft:axis3Padright])
 			norm=NormLayer(
 				input=state,
 				shape=layer_size,

@@ -120,5 +120,5 @@ class DropoutConvPool(ConvPool):
 		self.output=dropoutFunc(rng,self.output,dropout)
 
 	def process(self,data,batchSize):
-		output=ConvPool.__init__(self,data,batchSize)
+		output=ConvPool.process(self,data,batchSize)
 		return output*self.dropoutRate

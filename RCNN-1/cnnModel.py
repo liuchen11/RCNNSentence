@@ -1,4 +1,5 @@
 import cPickle,sys
+import time
 import numpy as np
 import theano
 import theano.tensor as T
@@ -121,35 +122,17 @@ class CNNModel(object):
 		for i in xrange(len(filters)):
 			filterSize=filterSizes[i]
 			poolSize=poolSizes[i]
-			ConvLayer=ConvPool(
+			ConvLayer=DropoutConvPool(
 				rng=rng,
 				input=input,
 				shape=shape,
 				filters=filterSize,
-				pool=poolSize
+				pool=poolSize,
+				dropout=dropoutRate[0]
 			)
-			#RConvLayer=RecurrentConvLayer(
-			#	rng=rng,
-			#	input=input,
-			#	shape=shape,
-			#	filters=filterSize,
-			#	rfilter=[features[0],features[0],rfilter[0],rfilter[1]],
-			#	alpha=0.001, beta=0.75,
-			#	N=int(features[0]/8+1),
-			#	time=time,
-			#	pool=poolSize
-			#)
 			self.layers0.append(ConvLayer)
 			layer1Inputs.append(ConvLayer.output.flatten(2))
 
-		#self.layer1=DropoutHiddenLayer(
-		#	rng,
-		#	input=T.concatenate(layer1Inputs,1),
-		#	n_in=len(filters)*features[0],
-		#	n_out=categories,
-		#	activation=ReLU,
-		#	dropoutRate=dropoutRate[0]
-		#)
 		self.layer1=LogisticRegression(
 			input=T.concatenate(layer1Inputs,1),
 			n_in=len(filters)*features[0],
@@ -217,7 +200,12 @@ class CNNModel(object):
 		self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]})
 		print 'training model constructed!'
 
-		f=theano.function([index],self.y,givens={self.y:validateY[index*self.batchSize:(index+1)*self.batchSize]})
+		testTrain=theano.function(
+		[index],self.errors,
+		givens={
+		self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
+		self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]})
+		print 'test training set model constructed!'
 
 		validateModel=theano.function(
 		[index],self.errors,
@@ -244,6 +232,8 @@ class CNNModel(object):
 		rate=0.01
 		bestValPrecision=0.0
 		finalPrecision=0.0
+		self.records=[]
+		self.result={}
 
 		while epoch<nEpoch and iteration<maxIteration:
 			epoch+=1
@@ -251,33 +241,64 @@ class CNNModel(object):
 			for minBatch in np.random.permutation(range(trainBatches)):
 				cost=trainModel(minBatch)				#set zero func
 				if num%30==0:
+					trainError=[
+						testTrain(i)
+						for i in xrange(trainBatches)
+					]
+					trainPrecision=1-np.mean(trainError)
 					validateError=[
 						validateModel(i)
 						for i in xrange(validateBatches)
 					]
 					validatePrecision=1-np.mean(validateError)
-					print 'epoch=%i,num=%i,validation precision=%f%%'%(epoch,num,validatePrecision)
+					print 'epoch=%i,num=%i,train precision=%f%%, validation precision=%f%%'%(epoch,num,trainPrecision*100.,validatePrecision*100.)
 					testError=testModel(testX,testY)
 	                                testPrecision=1-testError
-	                                print 'testing precision=%f%%'%testPrecision
+	                                print 'testing precision=%f%%'%(testPrecision*100.)
+					
+					x=float(epoch)+float(num)/float(trainBatches)
+					self.records.append({'x':x,'trainAcc':trainPrecision,'validateAcc':validatePrecision,'testAcc':testPrecision})
+					
+					if validatePrecision>bestValPrecision:
+						print 'valid'
+						finalPrecision=testPrecision
+						bestValPrecision=validatePrecision
+					minError=min(minError,testError)
 				num+=1
 
-			print ''
+			trainError=[
+				testTrain(i)
+				for i in xrange(trainBatches)
+			]
+			trainPrecision=1-np.mean(trainError)
 			validateError=[
 				validateModel(i)
 				for i in xrange(validateBatches)
 			]
 			validatePrecision=1-np.mean(validateError)
-			print 'epoch=%i,validation precision=%f%%'%(epoch,validatePrecision)
-			if validatePrecision>bestValPrecision:
-				print 'testing...'
-				testError=testModel(testX,testY)
-				testPrecision=1-testError
-				print 'testing precision=%f%%'%testPrecision
-				finalPrecision=testPrecision
-				minError=min(minError,testError)
+			print 'epoch=%i,train precision=%f%%, validation precision=%f%%'%(epoch,trainPrecision*100.,validatePrecision*100.)
+			testError=testModel(testX,testY)
+			testPrecision=1-testError
+			print 'testing precision=%f%%'%(testPrecision*100.)
 
-			print 'minError=%f%%'%(minError)
+			x=float(epoch)
+			self.records.append({'x':x,'trainAcc':trainPrecision,'validateAcc':validatePrecision,'testAcc':testPrecision})
+
+			if validatePrecision>bestValPrecision:
+				print 'valid'
+				finalPrecision=testPrecision
+				bestValPrecision=validatePrecision
+			minError=min(minError,testError)
+
+			print 'minError=%f%%'%(minError*100.)
+			print 'finalPrecision=%f%%'%(finalPrecision*100.)
+
+		self.result={'minError':minError,'finalAcc':finalPrecision,'bestValAcc':bestValPrecision}
 
 		return finalPrecision
 
+	def save(self):
+		savePath='../Results/'
+		timeStruct=time.localtime(time.time())
+		fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+str(self.result['finalAcc'])+'cnn'
+		cPickle.dump([self.records,self.result],open(savePath+fileName,'wb'))

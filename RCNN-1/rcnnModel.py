@@ -122,14 +122,7 @@ class RCNNModel(object):
 		for i in xrange(len(filters)):
 			filterSize=filterSizes[i]
 			poolSize=poolSizes[i]
-			#ConvLayer=ConvPool(
-			#	rng=rng,
-			#	input=input,
-			#	shape=shape,
-			#	filters=filterSize,
-			#	pool=poolSize
-			#)
-			RConvLayer=RecurrentConvLayer(
+			RConvLayer=DropoutRecurrentConvLayer(
 				rng=rng,
 				input=input,
 				shape=shape,
@@ -138,19 +131,12 @@ class RCNNModel(object):
 				alpha=0.001, beta=0.75,
 				N=int(features[0]/8+1),
 				time=time,
-				pool=poolSize
+				pool=poolSize,
+				dropout=dropoutRate[0]
 			)
 			self.layers0.append(RConvLayer)
 			layer1Inputs.append(RConvLayer.output.flatten(2))
 
-		#self.layer1=DropoutHiddenLayer(
-		#	rng,
-		#	input=T.concatenate(layer1Inputs,1),
-		#	n_in=len(filters)*features[0],
-		#	n_out=categories,
-		#	activation=ReLU,
-		#	dropoutRate=dropoutRate[0]
-		#)
 		self.layer1=LogisticRegression(
 			input=T.concatenate(layer1Inputs,1),
 			n_in=len(filters)*features[0],
@@ -187,6 +173,7 @@ class RCNNModel(object):
 		>>>type nEpoch: int
 		>>>para nEpoch: maximum iteration epoches
 		'''
+		print trainSet['x'].shape
 		trainSize=trainSet['x'].shape[0]
 		validateSize=validateSet['x'].shape[0]
 		testSize=testSet['x'].shape[0]
