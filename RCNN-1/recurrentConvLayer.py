@@ -10,36 +10,6 @@ from normLayer import *
 def ReLU(x):
 	return theano.tensor.switch(x<0,0,x)
 
-def TensorPadding(input,axis,width):
-	'''
-	>>>type input: T.tensorVariable
-	>>>para input: input TensorVariable
-
-	>>>type axis: int
-	>>>para axis: which dimension to be padded
-
-	>>>type width: int
-	>>>para width: padding width
-	'''
-	shape=[]
-	for i in xrange(input.ndim):
-		shape.append(input.shape[i])
-	pad_left=(width+1)/2
-	pad_right=width/2
-	
-	if pad_left>0:
-		left_shape=shape
-		left_shape[axis]=pad_left
-		left=T.zeros(left_shape)
-		input=T.concatenate([left,input],axis=axis)
-
-	if pad_right>0:
-		right_shape=shape
-		right_shape[axis]=pad_right
-		right=T.zeros(right_shape)
-		input=T.concatenate([input,right],axis=axis)
-	return input
-
 class RecurrentConvLayer(object):
 	
 	def __init__(self,rng,input,shape,filters,rfilter,alpha,beta,N,time,pool):
@@ -106,6 +76,8 @@ class RecurrentConvLayer(object):
 		state=conv_input+self.b_r.dimshuffle('x',0,'x','x')
 		axis2Padleft=rfilter[2]/2;axis2Padright=(rfilter[2]-1)/2
 		axis3Padleft=rfilter[3]/2;axis3Padright=(rfilter[3]-1)/2
+		axis2Padright=layer_size[2]+rfilter[2]-1 if axis2Padright==0 else -axis2Padright
+		axis3Padright=layer_size[3]+rfilter[3]-1 if axis3Padright==0 else -axis3Padright
 		for i in xrange(time):
 			conv_recurrent=conv.conv2d(
 				input=state,
@@ -114,8 +86,6 @@ class RecurrentConvLayer(object):
 				image_shape=layer_size,
 				border_mode='full'
 			)
-			axis2Padright=layer_size[2]+rfilter[2]-1 if axis2Padright==0 else -axis2Padright
-			axis3Padright=layer_size[3]+rfilter[3]-1 if axis3Padright==0 else -axis3Padright
 			state=ReLU(conv_input+conv_recurrent[:,:,axis2Padleft:axis2Padright,axis3Padleft:axis3Padright])
 #			padded_input=TensorPadding(TensorPadding(input=state,width=rfilter[2]-1,axis=2),width=rfilter[3]-1,axis=3)
 #			conv_recurrent=conv.conv2d(
@@ -164,15 +134,19 @@ class RecurrentConvLayer(object):
 		)
 
 		state=conv_input+self.b_r.dimshuffle('x',0,'x','x')
+		axis2Padleft=self.rfilter[2]/2;axis2Padright=(self.rfilter[2]-1)/2
+		axis3Padleft=self.rfilter[3]/2;axis3Padright=(self.rfilter[3]-1)/2
+                axis2Padright=layer_size[2]+self.rfilter[2]-1 if axis2Padright==0 else -axis2Padright
+                axis3Padright=layer_size[3]+self.rfilter[3]-1 if axis3Padright==0 else -axis3Padright
 		for i in xrange(self.time):
-			padded_input=TensorPadding(TensorPadding(input=state,width=self.rfilter[2]-1,axis=2),width=self.rfilter[3]-1,axis=3)
 			conv_recurrent=conv.conv2d(
-				input=padded_input,
+				input=state,
 				filters=self.w_r,
 				filter_shape=self.rfilter,
-				image_shape=[layer_size[0],layer_size[1],layer_size[2]+self.rfilter[2]-1,layer_size[3]+self.rfilter[3]-1]
+				image_shape=layer_size,
+				border_mode='full'
 			)
-			state=ReLU(conv_input+conv_recurrent)
+			state=ReLU(conv_input+conv_recurrent[:,:,axis2Padleft,axis2Padright,axis3Padleft,axis3Padright])
 			norm=NormLayer(
 				input=state,
 				shape=layer_size,
@@ -189,3 +163,29 @@ class RecurrentConvLayer(object):
 		)
 		output=pool_out+self.b.dimshuffle('x',0,'x','x')
 		return output
+
+def dropoutFunc(rng,value,p):
+	'''
+	>>>dropout layer
+
+	>>>type rng: numpy.random.RandomState
+	>>>para rng: random seed
+	>>>type value: T.tensor4
+	>>>para value: input value
+	>>>type p: float
+	>>>para p: dropout rate
+	'''
+	srng=T.shared_randomstreams.RandomStreams(rng.randint(2011010539))
+	mask=srng.binomial(n=1,p=1-p,size=value.shape)
+	return value*T.cast(mask,theano.config.floatX)
+
+class DropoutRecurrentConvLayer(RecurrentConvLayer):
+
+	def __init__(self,rng,input,shape,filters,rfilter,alpha,beta,N,time,pool,dropout=0.5):
+		RecurrentConvLayer.__init__(self,rng,input,shape,filters,rfilter,alpha,beta,N,time,pool)
+		self.dropoutRate=dropout
+		self.output=dropoutFunc(rng,self.output,dropout)
+
+	def process(self,data,batchSize):
+		output=RecurrentConvLayer.process(self,data,batchSize)
+		return output*self.dropoutRate

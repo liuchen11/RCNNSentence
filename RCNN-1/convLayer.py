@@ -96,3 +96,29 @@ class ConvPool(object):
 		)
 		output=T.tanh(pool_out+self.b.dimshuffle('x',0,'x','x'))
 		return output
+
+def dropoutFunc(rng,value,p):
+	'''
+	>>>dropout function
+
+	>>>type rng: numpy.random.RandomState
+	>>>para rng: random seed
+	>>>type value: T.tensor4
+	>>>para value: input value
+	>>>type p: float
+	>>>para p: dropout rate
+	'''
+	srng=T.shared_randomstreams.RandomStreams(rng.randint(2011010539))
+	mask=srng.binomial(n=1,p=1-p,size=value.shape)
+	return value*T.cast(mask,theano.config.floatX)
+
+class DropoutConvPool(ConvPool):
+
+	def __init__(self,rng,input,shape,filters,pool,dropout=0.5):
+		ConvPool.__init__(self,rng,input,shape,filters,pool)
+		self.dropoutRate=dropout
+		self.output=dropoutFunc(rng,self.output,dropout)
+
+	def process(self,data,batchSize):
+		output=ConvPool.__init__(self,data,batchSize)
+		return output*self.dropoutRate
