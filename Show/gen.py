@@ -99,8 +99,8 @@ if __name__=='__main__':
 		outFileName='./charts/'+name+'.htm'
 
 	data=cPickle.load(open(fileName,'rb'))
-	records=data[0]
-	result=data[1]
+	result=data[0];trainAcc=data[1]
+	validateAcc=data[2];testAcc=data[3]
 
 	finalAcc=round(result['finalAcc']*100.,2)
 	bestValAcc=round(result['bestValAcc']*100.,2)
@@ -117,40 +117,33 @@ if __name__=='__main__':
           name:'TrainAcc',
           data:[
 		''')
-		for i in xrange(len(records)):
-			if i>0 and records[i]['x']<records[i-1]['x']:
-				fopen.write('          ['+str(records[i]['x'])+', '+str(records[i]['trainAcc']*100.)+'],\n')
-			elif i+1!=len(records):
-				fopen.write('          ['+str(records[i]['x']-1+1e-2)+', '+str(records[i]['trainAcc']*100.)+'],\n')
+		for i in xrange(len(trainAcc)):
+			if i+1!=len(trainAcc):
+				fopen.write('          ['+str(trainAcc[i]['x'])+', '+str(trainAcc[i]['acc']*100.)+'],\n')
 			else:
-				fopen.write('          ['+str(records[i]['x']-1+1e-2)+', '+str(records[i]['trainAcc']*100.)+']\n')
+				fopen.write('          ['+str(trainAcc[i]['x'])+', '+str(trainAcc[i]['acc']*100.)+']\n')
 		fopen.write('''
           ]
         }, {
           name:'ValAcc',
           data:[
 			''')
-		for i in xrange(len(records)):
-			if i>0 and records[i]['x']<records[i-1]['x']:
-				
-				fopen.write('          ['+str(records[i]['x'])+', '+str(records[i]['validateAcc']*100.)+'],\n')
-			elif i+1!=len(records):
-				fopen.write('          ['+str(records[i]['x']-1+1e-2)+', '+str(records[i]['validateAcc']*100.)+'],\n')
+		for i in xrange(len(validateAcc)):
+			if i+1!=len(validateAcc):
+				fopen.write('          ['+str(validateAcc[i]['x'])+', '+str(validateAcc[i]['acc']*100.)+'],\n')
 			else:
-				fopen.write('          ['+str(records[i]['x']-1+1e-2)+', '+str(records[i]['validateAcc']*100.)+']\n')
+				fopen.write('          ['+str(validateAcc[i]['x'])+', '+str(validateAcc[i]['acc']*100.)+']\n')
 		fopen.write('''
           ]
         }, {
           name:'TestAcc',
           data:[
 			''')
-		for i in xrange(len(records)):
-			if i>0 and records[i]['x']<records[i-1]['x']:
-				fopen.write('          ['+str(records[i]['x'])+', '+str(records[i]['testAcc']*100.)+']\n')
-			elif i+1!=len(records):
-				fopen.write('          ['+str(records[i]['x']-1+1e-2)+', '+str(records[i]['testAcc']*100.)+'],\n')
+		for i in xrange(len(testAcc)):
+			if i+1!=len(testAcc):
+				fopen.write('          ['+str(testAcc[i]['x'])+', '+str(testAcc[i]['acc']*100.)+'],\n')
 			else:
-				fopen.write('          ['+str(records[i]['x']-1+1e-2)+', '+str(records[i]['testAcc']*100.)+']\n')
+				fopen.write('          ['+str(testAcc[i]['x'])+', '+str(testAcc[i]['acc']*100.)+']\n')
 		fopen.write('''
           ]
         }]

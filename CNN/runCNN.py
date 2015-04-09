@@ -1,7 +1,7 @@
 import sys,warnings
 import numpy as np
 
-from rcnnModel import *
+from cnnModel import *
 from loadWordVec import *
 
 warnings.filterwarnings('ignore')
@@ -65,7 +65,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 	>>>type static:bool
 	>>>para static:whether or not to use static wordVec
 	>>>type name:str
-	>>>para name:the name of the model
+	>>>para name:model's name
 	'''
 	categories=config['classes']
 	sets=config['all']
@@ -153,12 +153,12 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 		testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-		network=RCNNModel(
+		network=CNNModel(
 			wordMatrix=vectors,
 			shape=(batchSize,1,maxLen,dimension),
 			filters=(3,4,5),
 			rfilter=(5,1),
-			features=(80,),
+			features=(100,),
 			time=5,categories=categories,
 			static=static,
 			dropoutRate=(0.5,),
@@ -220,12 +220,12 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-			network=RCNNModel(
+			network=CNNModel(
 				wordMatrix=vectors,
 				shape=(batchSize,1,maxLen,dimension),
 				filters=(3,4,5),
 				rfilter=(5,1),
-				features=(80,),
+				features=(100,),
 				time=1,categories=categories,
 				static=static,
 				dropoutRate=(0.5,),

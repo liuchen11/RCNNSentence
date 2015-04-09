@@ -7,9 +7,8 @@ from collections import defaultdict, OrderedDict
 
 from loadWordVec import *
 from hiddenLayer import *
+from convLayer import *
 from logisticRegression import *
-from normLayer import *
-from recurrentConvLayer import *
 
 sys.setrecursionlimit(40000)
 
@@ -67,7 +66,7 @@ def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
 			updates[param]=stepped_param
 	return updates
 
-class RCNNModel(object):
+class CNNModel(object):
 	
 	def __init__(self,wordMatrix,shape,filters,rfilter,features,time,
 			categories,static,dropoutRate,learningRate,name):
@@ -95,7 +94,7 @@ class RCNNModel(object):
 		>>>type learningRate: float
 		>>>para learningRate: learning rate
 		>>>type name: str
-		>>>para name: the name of the model
+		>>>para name: model's name
 		'''
 		self.learningRate=learningRate
 		self.static=static
@@ -124,20 +123,16 @@ class RCNNModel(object):
 		for i in xrange(len(filters)):
 			filterSize=filterSizes[i]
 			poolSize=poolSizes[i]
-			RConvLayer=DropoutRecurrentConvLayer(
+			ConvLayer=DropoutConvPool(
 				rng=rng,
 				input=input,
 				shape=shape,
 				filters=filterSize,
-				rfilter=[features[0],features[0],rfilter[0],rfilter[1]],
-				alpha=0.001, beta=0.75,
-				N=int(features[0]/8+1),
-				time=time,
 				pool=poolSize,
 				dropout=dropoutRate[0]
 			)
-			self.layers0.append(RConvLayer)
-			layer1Inputs.append(RConvLayer.output.flatten(2))
+			self.layers0.append(ConvLayer)
+			layer1Inputs.append(ConvLayer.output.flatten(2))
 
 		self.layer1=LogisticRegression(
 			input=T.concatenate(layer1Inputs,1),
@@ -145,24 +140,20 @@ class RCNNModel(object):
 			n_out=categories,
 		)
 
+		self.cost=self.layer1.negative_log_likelyhood(self.y)
+		self.errors=self.layer1.errors(self.y)
+
 		self.params=self.layer1.param
 		for layer in self.layers0:
 			self.params+=layer.param
-		weights=0
-		for param in self.layer1.param:
-			weights+=T.sum(T.sqr(param))
 		if static==False:
 			self.params+=[self.wordVec]
-
-
-		self.cost=self.layer1.negative_log_likelyhood(self.y)+1e-4*T.sqrt(weights) #Weight Decay
-		self.errors=self.layer1.errors(self.y)
 
 		#for key in self.params:
 		#	print key.name,key.get_value().shape
 		grads=T.grad(self.cost,self.params)
 		self.update=[
-			(paramI,paramI-gradI*0.03)
+			(paramI,paramI-gradI*self.lr)
 			for (paramI,gradI) in zip(self.params,grads)
 		]
 		self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost)
@@ -302,6 +293,7 @@ class RCNNModel(object):
 		self.result={'minError':minError,'finalAcc':finalPrecision,'bestValAcc':bestValPrecision}
 
 		return finalPrecision
+
 
 	def save(self):
 		savePath='../Results/'
