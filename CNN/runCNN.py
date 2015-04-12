@@ -112,15 +112,30 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 		if len(validation)==0:				#No ValidationSet
 			newTrainSetX=[];newValidationSetX=[]
 			newTrainSetY=[];newValidationSetY=[]
-			index=0
+
+			validateEachType=int(len(trainSetX)*0.1/categories)
+			validationType=[]
+			for i in xrange(categories):
+				validationType.append(0)
+
 			for i in np.random.permutation(range(len(trainSetX))):
-				if index<len(trainSetX)*0.9:
-					newTrainSetX.append(trainSetX[i])
-					newTrainSetY.append(trainSetY[i])
-				else:
+				Type=trainSetY[i]
+				if validationType[Type]<validateEachType:
 					newValidationSetX.append(trainSetX[i])
 					newValidationSetY.append(trainSetY[i])
-				index+=1
+					validationType[Type]+=1
+				else:
+					newTrainSetX.append(trainSetX[i])
+					newTrainSetY.append(trainSetY[i])
+			# index=0
+			# for i in np.random.permutation(range(len(trainSetX))):
+			# 	if index<len(trainSetX)*0.9:
+			# 		newTrainSetX.append(trainSetX[i])
+			# 		newTrainSetY.append(trainSetY[i])
+			# 	else:
+			# 		newValidationSetX.append(trainSetX[i])
+			# 		newValidationSetY.append(trainSetY[i])
+			# 	index+=1
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 				
@@ -168,7 +183,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 
 		precision=network.train_validate_test(trainSet,validateSet,testSet,10)
 		network.save()
-		print 'Final Precision Rate %f%%'%(precision*100.)
+		print 'Model '+name+' :Final Precision Rate %f%%'%(precision*100.)
 	else:
 		precisions=[]
 		for item in sets:
@@ -186,15 +201,31 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			#No ValidationSet
 			newTrainSetX=[];newValidationSetX=[]
 			newTrainSetY=[];newValidationSetY=[]
-			index=0
+
+			validateEachType=int(len(trainSetX)*0.1/categories)
+			validationType=[]
+			for i in xrange(categories):
+				validationType.append(0)
+
 			for i in np.random.permutation(range(len(trainSetX))):
-				if index<len(trainSetX)*0.9:
-					newTrainSetX.append(trainSetX[i])
-					newTrainSetY.append(trainSetY[i])
-				else:
+				Type=trainSetY[i]
+				if validationType[Type]<validateEachType:
 					newValidationSetX.append(trainSetX[i])
 					newValidationSetY.append(trainSetY[i])
-				index+=1
+					validationType[Type]+=1
+				else:
+					newTrainSetX.append(trainSetX[i])
+					newTrainSetY.append(trainSetY[i])
+
+			# index=0
+			# for i in np.random.permutation(range(len(trainSetX))):
+			# 	if index<len(trainSetX)*0.9:
+			# 		newTrainSetX.append(trainSetX[i])
+			# 		newTrainSetY.append(trainSetY[i])
+			# 	else:
+			# 		newValidationSetX.append(trainSetX[i])
+			# 		newValidationSetY.append(trainSetY[i])
+			# 	index+=1
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 
@@ -236,7 +267,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			precision=network.train_validate_test(trainSet,validateSet,testSet,10)
 			network.save()
 			precisions.append(precision)
-		print 'Final Precision Rate %f%%'%(np.mean(precisions)*100.)
+		print 'Model '+name+' :Final Precision Rate %f%%'%(np.mean(precisions)*100.)
 
 if __name__=='__main__':
 	static=False
@@ -278,5 +309,21 @@ if __name__=='__main__':
 					raise NotImplementedError('command line error')
 	print 'config: dataFile:%s, vecFile:%s, static:%r, rand:%r'%(dataFile,vecFile,static,rand)
 
+	saveFile='../Models/'+name
+	fwrite=open(saveFile,'w')
+	cmd='python'
+        for item in sys.argv:
+                cmd+=' '+item
+        fwrite.write(cmd+'\n')
+	fwrite.write('##########runRCNN.py############\n')
+	with open('runCNN.py','r') as fopen:
+		for line in fopen:
+			fwrite.write(line)
+	fwrite.write('##########cnnModel.py#############\n')
+	with open('cnnModel.py','r') as fopen:
+		for line in fopen:
+			fwrite.write(line)
+	fwrite.close()
+	print 'model '+name+' saved!'
 	sentences,vocab,config,vectors,wordIndex=loadDatas(dataFile=dataFile,wordVecFile=vecFile,dimension=300,rand=rand)
 	parseConfig(sentences,vocab,config,vectors,wordIndex,static,name)

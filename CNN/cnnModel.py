@@ -123,13 +123,12 @@ class CNNModel(object):
 		for i in xrange(len(filters)):
 			filterSize=filterSizes[i]
 			poolSize=poolSizes[i]
-			ConvLayer=DropoutConvPool(
+			ConvLayer=ConvPool(
 				rng=rng,
 				input=input,
 				shape=shape,
 				filters=filterSize,
-				pool=poolSize,
-				dropout=dropoutRate[0]
+				pool=poolSize
 			)
 			self.layers0.append(ConvLayer)
 			layer1Inputs.append(ConvLayer.output.flatten(2))
@@ -140,14 +139,18 @@ class CNNModel(object):
 			n_out=categories,
 		)
 
-		self.cost=self.layer1.negative_log_likelyhood(self.y)
-		self.errors=self.layer1.errors(self.y)
-
 		self.params=self.layer1.param
 		for layer in self.layers0:
 			self.params+=layer.param
 		if static==False:
 			self.params+=[self.wordVec]
+
+		weights=0
+		for param in self.layer1.param:
+			weights+=T.sum(T.sqr(param))
+
+		self.cost=self.layer1.negative_log_likelyhood(self.y)
+		self.errors=self.layer1.errors(self.y)
 
 		#for key in self.params:
 		#	print key.name,key.get_value().shape
@@ -232,6 +235,7 @@ class CNNModel(object):
 		self.trainAcc=[]
 		self.validateAcc=[]
 		self.testAcc=[]
+		self.costValue=[]
 		self.result={}
 
 		while epoch<nEpoch and iteration<maxIteration:
@@ -239,8 +243,9 @@ class CNNModel(object):
 			num=0
 			for minBatch in np.random.permutation(range(trainBatches)):
 				cost=trainModel(minBatch)				#set zero func
+				x=float(epoch)+float(num+1)/float(trainBatches)-1
+				self.costValue.append({'x':x,'value':cost})
 				if num%50==0:
-					x=float(epoch)+float(num+1)/float(trainBatches)-1
 					trainError=[
 						testTrain(i)
 						for i in xrange(trainBatches)
@@ -294,9 +299,8 @@ class CNNModel(object):
 
 		return finalPrecision
 
-
 	def save(self):
 		savePath='../Results/'
 		timeStruct=time.localtime(time.time())
 		fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+str(self.result['finalAcc'])+'_'+self.name
-		cPickle.dump([self.result,self.trainAcc,self.validateAcc,self.testAcc],open(savePath+fileName,'wb'))
+		cPickle.dump([self.result,self.trainAcc,self.validateAcc,self.testAcc,self.costValue],open(savePath+fileName,'wb'))

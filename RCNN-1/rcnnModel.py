@@ -241,6 +241,7 @@ class RCNNModel(object):
 		self.trainAcc=[]
 		self.validateAcc=[]
 		self.testAcc=[]
+		self.costValue=[]
 		self.result={}
 
 		while epoch<nEpoch and iteration<maxIteration:
@@ -248,8 +249,9 @@ class RCNNModel(object):
 			num=0
 			for minBatch in np.random.permutation(range(trainBatches)):
 				cost=trainModel(minBatch)				#set zero func
+				x=float(epoch)+float(num+1)/float(trainBatches)-1
+				self.costValue.append({'x':x,'value':cost})
 				if num%50==0:
-					x=float(epoch)+float(num+1)/float(trainBatches)-1
 					trainError=[
 						testTrain(i)
 						for i in xrange(trainBatches)
@@ -307,4 +309,4 @@ class RCNNModel(object):
 		savePath='../Results/'
 		timeStruct=time.localtime(time.time())
 		fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+str(self.result['finalAcc'])+'_'+self.name
-		cPickle.dump([self.result,self.trainAcc,self.validateAcc,self.testAcc],open(savePath+fileName,'wb'))
+		cPickle.dump([self.result,self.trainAcc,self.validateAcc,self.testAcc,self.costValue],open(savePath+fileName,'wb'))

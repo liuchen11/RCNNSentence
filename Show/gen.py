@@ -13,7 +13,7 @@ ${demo.css}
 		</style>
 		<script type="text/javascript">
 $(function () {
-    $('#container').highcharts({
+    $('#container1').highcharts({
         chart: {
             type: 'spline'
         },
@@ -51,12 +51,73 @@ framwork2='''
    });
 });
 		</script>
+<script type="text/javascript">
+$(function () {
+    $('#container2').highcharts({
+        chart: {
+            zoomType: 'x'
+        },
+        title: {
+            text: 'Value of Loss Function'
+        },
+        subtitle: {},
+        xAxis: {
+            title:{
+                text: 'Epoch'
+            },
+            minRange: %f
+        },
+        yAxis: {
+            title: {
+                text: 'Value'
+            }
+        },
+        legend: {
+            enabled: false
+        },
+        plotOptions: {
+            area: {
+                fillColor: {
+                    linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1},
+                    stops: [
+                        [0, Highcharts.getOptions().colors[0]],
+                        [1, Highcharts.Color(Highcharts.getOptions().colors[0]).setOpacity(0).get('rgba')]
+                    ]
+                },
+                marker: {
+                    radius: 2
+                },
+                lineWidth: 1,
+                states: {
+                    hover: {
+                        lineWidth: 1
+                    }
+                },
+                threshold: null
+            }
+        },
+
+        series: [{
+            type: 'area',
+            name: 'Value',
+            pointInterval: %f,
+            pointStart: 0,
+            data: [
+'''
+framwork3='''
+            ]
+        }]
+    });
+});
+          </script>
+
 	</head>
 	<body>
 <script src="../js/highcharts.js"></script>
 <script src="../js/modules/exporting.js"></script>
 
-<div id="container" style="min-width: 310px; height: 800px; margin: 0 auto"></div>
+<div id="container1" style="min-width: 310px; height: 800px; margin: 0 auto"></div>
+<div id="container2" style="min-width: 310px; height: 800px; margin: 0 auto"></div>
 
 	</body>
 </html>
@@ -99,8 +160,8 @@ if __name__=='__main__':
 		outFileName='./charts/'+name+'.htm'
 
 	data=cPickle.load(open(fileName,'rb'))
-	result=data[0];trainAcc=data[1]
-	validateAcc=data[2];testAcc=data[3]
+	result=data[0];costValue=data[4]
+	trainAcc=data[1];validateAcc=data[2];testAcc=data[3]
 
 	finalAcc=round(result['finalAcc']*100.,2)
 	bestValAcc=round(result['bestValAcc']*100.,2)
@@ -148,4 +209,13 @@ if __name__=='__main__':
           ]
         }]
 			''')
-		fopen.write(framwork2)
+		minInterval=costValue[1]['x']-costValue[0]['x']
+		fopen.write(framwork2%(minInterval,minInterval))
+		for i in xrange(len(costValue)):
+			if i+1==len(costValue):
+				fopen.write(str(costValue[i]['value'])+'\n')
+			else:
+				fopen.write(str(costValue[i]['value'])+',')
+			if i%100==0:
+				fopen.write('\n\t')
+		fopen.write(framwork3)
