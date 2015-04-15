@@ -131,7 +131,6 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 				
-
 		if len(trainSetX)%batchSize>0:
 			extraNum=batchSize-len(trainSetX)%batchSize
 			extraIndex=np.random.permutation(range(len(trainSetX)))
@@ -154,30 +153,18 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
                 network=DRCNNModel(
-                        wordMatrix=vectors,
-                        shape=(batchSize,1,maxLen,dimension),
-                        filters=((3,300),(3,1),(3,1)),
-                        rfilter=((0,0),(3,1),(3,1)),
-                        features=(32,64,128),
-                        poolSize=((1,1),(2,1),((maxLen-4)/2-2,1)),
-                        time=1,categories=categories,
-                        static=static,
-                        dropoutRate=(0.1,0.2,0.5),
-                        learningRate=0.1,
-                        name=name
+                    wordMatrix=vectors,
+                    shape=(batchSize,1,maxLen,dimension),
+                    filters=((3,300),(3,1),(3,1),(3,1)),
+                    rfilter=((0,0),(3,1),(3,1)),
+                    features=(32,64,128,256),
+                    poolSize=((1,1),(1,1),(2,1),((maxLen-6)/2-2,1)),
+                    time=1,categories=categories,
+                    static=static,
+                    dropoutRate=(0.1,0.2,0.3,0.5),
+                    learningRate=0.1,
+                    name=name
                     )
-		#network=RCNNModel(
-		#	wordMatrix=vectors,
-		#	shape=(batchSize,1,maxLen,dimension),
-		#	filters=(3,4,5),
-		#	rfilter=(5,1),
-		#	features=(80,),
-		#	time=1,categories=categories,
-		#	static=static,
-		#	dropoutRate=(0.5,),
-		#	learningRate=0.01,
-		#	name=name
-		#)
 
 		precision=network.train_validate_test(trainSet,validateSet,testSet,10)
 		network.save()
@@ -240,33 +227,21 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
+                        
                         network=DRCNNModel(
                             wordMatrix=vectors,
                             shape=(batchSize,1,maxLen,dimension),
-                            filters=((3,300),(3,1),(3,1)),
+                            filters=((3,300),(3,1),(3,1),(3,1)),
                             rfilter=((0,0),(3,1),(3,1)),
-                            features=(32,64,128),
-                            poolSize=((1,1),(2,1),((maxLen-4)/2-2,1)),
+                            features=(32,64,128,256),
+                            poolSize=((1,1),(1,1),(2,1),((maxLen-6)/2-2,1)),
                             time=1,categories=categories,
                             static=static,
-                            dropoutRate=(0.1,0.2,0.5),
-                            learningRate=0.1,
+                            dropoutRate=(0.1,0.2,0.3,0.5),
+                            learningRate=0.001,
                             name=name
                             )
                         
-			#network=RCNNModel(
-			#	wordMatrix=vectors,
-			#	shape=(batchSize,1,maxLen,dimension),
-			#	filters=(3,4,5),
-			#	rfilter=(5,1),
-			#	features=(80,),
-			#	time=1,categories=categories,
-			#	static=static,
-			#	dropoutRate=(0.5,),
-			#	learningRate=0.01,
-			#	name=name
-			#)
-
 			precision=network.train_validate_test(trainSet,validateSet,testSet,10)
 			network.save()
 			precisions.append(precision)

@@ -22,21 +22,53 @@ def as_floatX(variable):
         return np.cast[theano.config.floatX](variable)
     return T.cast(variable,theano.config.floatX)
 
-def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
+def AdadeltaMomentumUpdate(params,cost,stepSize=1.0,momentum=0.9,rho=0.95,epsilon=1e-6,norm_lim=9):
     '''
-    >>>
-
+    >>>adadelta-update with momentum
     >>>type params: tuple or list
     >>>para params: parameters
-    >>>type cost:
-    >>>para cost:
+    >>>type cost: T.tensorType
+    >>>para cost: goal to optimize
+    >>>type stepSize: float
+    >>>para stepSize: stepsize
+    >>>type momentum: float
+    >>>para momentum: momentum parameter
     >>>type rho: float
-    >>>para rho:
+    >>>para rho: memory
     >>>type epsilon: float
-    >>>para epsilon:
-    >>>type norm_lim:int
-    >>>para norm_lim:
+    >>>para epsilon: avoid zero-division
+    >>>type norm_lim: float
+    >>>para norm_lim: normalization limit
     '''
+    updates=OrderedDict({})
+    grads=T.grad(cost,params)
+    for param,grad in zip(params,grads):
+        empty=np.zeros_like(param.get_value())
+        oldGrad=theano.shared(value=as_floatX(empty),name='expGrad_%s'%param.name)
+        oldUpdate=theano.shared(value=as_floatX(empty),name='expUpdate_%s'%param.name)
+        oldDelta=theano.shared(value=as_floatX(empty),name='oldDelta_%s'%param.name)
+
+        newGrad=rho*oldGrad+(1-rho)*T.sqr(grad)
+        updates[oldGrad]=newGrad
+
+        step=-(T.sqrt(oldUpdate+epsilon)/T.sqrt(newGrad+epsilon))*grad
+        newDelta=step*stepSize
+        updates[oldDelta]=newDelta
+        newParam=param+newDelta+momentum*oldDelta
+
+        newUpdate=rho*oldUpdate+(1-rho)*T.sqr(step)
+        updates[oldUpdate]=newUpdate
+
+        if param.get_value(borrow=True).ndim==2 and param.name!='wordVec':
+            colNorm=T.sqrt(T.sum(T.sqr(newParam),axis=0))
+            desiredNorm=T.clip(colNorm,0,T.sqrt(norm_lim))
+            scale=desiredNorm/(1e-7+colNorm)
+            updates[param]=newParam/scale
+        else:
+            updates[param]=newParam
+    return updates
+
+def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
     updates=OrderedDict({})
     exp_sqr_grads=OrderedDict({})
     exp_sqr_update=OrderedDict({})
@@ -66,6 +98,28 @@ def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
             updates[param]=stepped_param*scale
         else:
             updates[param]=stepped_param
+    return updates
+
+def sgdMomentum(params,cost,learningRate,momentum=0.9):
+    '''
+    >>>SGD optimizer with momentum
+    >>>type params: tuple or list
+    >>>para params: parameters of the model
+    >>>type cost: T.tensorType
+    >>>para cost: goal to be optimized
+    >>>type learningRate: float
+    >>>para learningRate: learning rate
+    >>>type momentum: float
+    >>>para momentum: momentum weight
+    '''
+    grads=T.grad(cost,params)
+    updates=[]
+
+    for param_i,grad_i in zip(params,grads):
+        mparam_i=theano.shared(np.zeros(param_i.get_value().shape,dtype=theano.config.floatX),broadcastable=param_i.broadcastable)
+        delta=momentum*mparam_i-learningRate*grad_i
+        updates.append((mparam_i,delta))
+        updates.append((param_i,param_i+delta))
     return updates
 
 class DRCNNModel(object):
@@ -143,14 +197,24 @@ class DRCNNModel(object):
                 dropout=dropoutRate[2]
                 )
 
-        classifierInputShape=[self.batchSize,features[2],(layer2InputShape[2]-filters[2][0]+1)/poolSize[2][0],(layer2InputShape[3]-filters[2][1]+1)/poolSize[2][1]]
+        layer3InputShape=[self.batchSize,features[2],(layer2InputShape[2]-filters[2][0]+1)/poolSize[2][0],(layer2InputShape[3]-filters[2][1]+1)/poolSize[2][1]]
+        self.layer3=DropoutConvPool(
+                rng=rng,
+                input=self.layer2.output,
+                shape=layer3InputShape,
+                filters=[features[3],features[2],filters[3][0],filters[3][1]],
+                pool=poolSize[3],
+                dropout=dropoutRate[3]
+                )
+
+        classifierInputShape=[self.batchSize,features[3],(layer3InputShape[2]-filters[3][0]+1)/poolSize[3][0],(layer3InputShape[3]-filters[3][1]+1)/poolSize[3][1]]
         self.classifier=LogisticRegression(
-                input=self.layer2.output.flatten(2),
+                input=self.layer3.output.flatten(2),
                 n_in=np.prod(classifierInputShape[1:]),
                 n_out=categories
                 )
 
-        self.params=self.layer0.param+self.layer1.param+self.layer2.param+self.classifier.param
+        self.params=self.layer0.param+self.layer1.param+self.layer2.param+self.layer3.param+self.classifier.param
         if static==False:
             self.params+=[self.wordVec]
 
@@ -158,15 +222,17 @@ class DRCNNModel(object):
         for item in self.classifier.param:
                 weights+=T.sum(T.sqr(item))
 
-        self.cost=self.classifier.negative_log_likelyhood(self.y)+1e-4*weights
+        self.cost=self.classifier.negative_log_likelyhood(self.y)+1e-5*weights
         self.errors=self.classifier.errors(self.y)
+        
         grads=T.grad(self.cost,self.params)
         self.update=[
                 (param_i,param_i-self.lr*grad_i)
                 for (param_i,grad_i) in zip(self.params,grads)
                 ]
-        
+        self.sgdMomentumUpdate=sgdMomentum(self.params,self.cost,self.lr)
         self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost)
+        self.adadeltaMomentumUpdate=AdadeltaMomentumUpdate(params=self.params,cost=self.cost,stepSize=self.lr)
 
         print 'model %s constructed!'%name
 
@@ -196,6 +262,7 @@ class DRCNNModel(object):
 
         index=T.iscalar('index')
         learnRate=T.dscalar('lr')
+        stepSize=T.dscalar('lr')
 
         sgdTrainModel=theano.function(
                 [index,learnRate],self.cost,updates=self.update,
@@ -205,6 +272,16 @@ class DRCNNModel(object):
                     self.lr:learnRate}
                 )
         print 'SGD TrainModel Constructed!'
+
+        sgdMomentumTrainModel=theano.function(
+                [index,learnRate],self.cost,updates=self.sgdMomentumUpdate,
+                givens={
+                    self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
+                    self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
+                    self.lr:learnRate}
+                )
+        print 'SGD-Momentum TrainModel Constructed!'
+
         adadeltaTrainModel=theano.function(
                 [index],self.cost,updates=self.adadeltaUpdate,
                 givens={
@@ -212,6 +289,15 @@ class DRCNNModel(object):
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]}
                 )
         print 'Adadelta TrainModel Constructed!'
+
+        adadeltaMomentumTrainModel=theano.function(
+                [index,stepSize],self.cost,updates=self.adadeltaMomentumUpdate,
+                givens={
+                    self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
+                    self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
+                    self.lr:stepSize}
+                )
+        print 'Adadelta(with momentum) TrainModel Constructed!'
 
         validateModel=theano.function(
                 [index],self.errors,
@@ -232,7 +318,8 @@ class DRCNNModel(object):
         testLayer0Input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape((testSize,self.featureMaps,self.sentenceLen,self.wdim))
         testLayer1Input=self.layer0.process(testLayer0Input,testSize)
         testLayer2Input=self.layer1.process(testLayer1Input,testSize)
-        testClassifierInput=self.layer2.process(testLayer2Input,testSize).flatten(2)
+        testLayer3Input=self.layer2.process(testLayer2Input,testSize)
+        testClassifierInput=self.layer3.process(testLayer3Input,testSize).flatten(2)
         testPredict=self.classifier.predictInstance(testClassifierInput)
         testError=T.mean(T.neq(testPredict,self.y))
         testModel=theano.function([self.x,self.y],testError)
@@ -240,6 +327,8 @@ class DRCNNModel(object):
 
         epoch=0
         learningRate=self.learningRate
+        steppingSize=1.0
+        localOpt=0
         bestTestAcc=0.0
         bestValAcc=0.0
         finalAcc=0.0
@@ -254,7 +343,8 @@ class DRCNNModel(object):
             num=0
 
             for minBatch in np.random.permutation(range(trainBatches)):
-                cost=adadeltaTrainModel(minBatch)
+                #cost=adadeltaTrainModel(minBatch)
+                cost=adadeltaMomentumTrainModel(minBatch,steppingSize)
                 x=float(epoch)+float(num+1)/float(trainBatches)-1
                 self.costValues.append({'x':x,'value':cost})
                 if num%50==0:
@@ -274,7 +364,16 @@ class DRCNNModel(object):
                         finalAcc=testAcc
                         self.testAccs.append({'x':x,'acc':testAcc})
                         print 'TestAcc=%f%%'%(testAcc*100.)
-                    print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc,bestTestAcc,finalAcc)
+                        localOpt=0
+                    else:
+                        localOpt+=1
+                        if localOpt>=5:
+                            learningRate/=10
+                            steppingSize/=10
+                            localOpt=0
+                            print 'Learning Rate %f->%f'%(learningRate*10.,learningRate)
+                            print 'stepping Size %f->%f'%(steppingRate*10.,steppingRate)
+                    print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc*100.,bestTestAcc*100.,finalAcc*100.)
                 num+=1
 
             x=float(epoch)
@@ -294,7 +393,16 @@ class DRCNNModel(object):
                 finalAcc=testAcc
                 self.testAccs.append({'x':x,'acc':testAcc})
                 print 'TestAcc=%f%%'%(testAcc*100.)
-            print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc,bestTestAcc,finalAcc)
+                localOpt=0
+            else:
+                localOpt+=1
+                if localOpt>=5:
+                    learningRate/=10
+                    steppingSize/=10
+                    localOpt=0
+                    print 'Learning Rate %f->%f'%(learningRate*10.,learningRate)
+                    print 'Stepping Size %f->%f'%(steppingSize*10.,steppingSize)
+            print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc*100.,bestTestAcc*100.,finalAcc*100.)
 
         self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}
         return finalAcc
