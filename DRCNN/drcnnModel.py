@@ -113,13 +113,25 @@ def sgdMomentum(params,cost,learningRate,momentum=0.9):
     >>>para momentum: momentum weight
     '''
     grads=T.grad(cost,params)
-    updates=[]
+    updates=OrderedDict({})
 
     for param_i,grad_i in zip(params,grads):
         mparam_i=theano.shared(np.zeros(param_i.get_value().shape,dtype=theano.config.floatX),broadcastable=param_i.broadcastable)
         delta=momentum*mparam_i-learningRate*grad_i
-        updates.append((mparam_i,delta))
-        updates.append((param_i,param_i+delta))
+        updates[mparam_i]=delta
+        updates[param_i]=param_i+delta
+    return updates
+
+def sgd(params,cost,learningRate):
+    '''
+    >>>SGD Update
+    >>>parameters are the same as above
+    '''
+    grads=T.grad(cost,params)
+    updates=OrderedDict({})
+
+    for param_i,grad_i in zip(params,grads):
+        updates[param_i]=param_i-learningRate*grad_i
     return updates
 
 class DRCNNModel(object):
@@ -167,54 +179,39 @@ class DRCNNModel(object):
         self.wordVec=theano.shared(wordMatrix,name='wordVec')
         input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape(shape)
 
-        layer0InputShape=shape
-        self.layer0=DropoutConvPool(
-                rng=rng,
-                input=input,
-                shape=layer0InputShape,
-                filters=[features[0],self.featureMaps,filters[0][0],filters[0][1]],
-                pool=poolSize[0],
-                dropout=dropoutRate[0]
-                )
+        self.deep=min(len(features),len(filters),len(poolSize))
+        self.layers=[]
+        print 'This is a network of %i layer(s)'%self.deep
 
-        layer1InputShape=[self.batchSize,features[0],(layer0InputShape[2]-filters[0][0]+1)/poolSize[0][0],(layer0InputShape[3]-filters[0][1]+1)/poolSize[0][1]]
-        self.layer1=DropoutConvPool(
-                rng=rng,
-                input=self.layer0.output,
-                shape=layer1InputShape,
-                filters=[features[1],features[0],filters[1][0],filters[1][1]],
-                pool=poolSize[1],
-                dropout=dropoutRate[1]
-                )
+        for i in xrange(self.deep):
+            if i==0:
+                layerSize=shape
+                layerInput=input
+                fmapIn=self.featureMaps
+            else:
+                layerSize=[self.batchSize,features[i-1],(self.layers[-1].shape[2]-filters[i-1][0]+1)/poolSize[i-1][0],(self.layers[-1].shape[3]-filters[i-1][1]+1)/poolSize[i-1][1]]
+                layerInput=self.layers[-1].output
+                fmapIn=features[i-1]
+            newlayer=DropoutConvPool(
+                    rng=rng,
+                    input=layerInput,
+                    shape=layerSize,
+                    filters=[features[i],fmapIn,filters[i][0],filters[i][1]],
+                    pool=poolSize[i],
+                    dropout=dropoutRate[i]
+                    )
+            self.layers.append(newlayer)
 
-        layer2InputShape=[self.batchSize,features[1],(layer1InputShape[2]-filters[1][0]+1)/poolSize[1][0],(layer1InputShape[3]-filters[1][1]+1)/poolSize[1][1]]
-        self.layer2=DropoutConvPool(
-                rng=rng,
-                input=self.layer1.output,
-                shape=layer2InputShape,
-                filters=[features[2],features[1],filters[2][0],filters[2][1]],
-                pool=poolSize[2],
-                dropout=dropoutRate[2]
-                )
-
-        layer3InputShape=[self.batchSize,features[2],(layer2InputShape[2]-filters[2][0]+1)/poolSize[2][0],(layer2InputShape[3]-filters[2][1]+1)/poolSize[2][1]]
-        self.layer3=DropoutConvPool(
-                rng=rng,
-                input=self.layer2.output,
-                shape=layer3InputShape,
-                filters=[features[3],features[2],filters[3][0],filters[3][1]],
-                pool=poolSize[3],
-                dropout=dropoutRate[3]
-                )
-
-        classifierInputShape=[self.batchSize,features[3],(layer3InputShape[2]-filters[3][0]+1)/poolSize[3][0],(layer3InputShape[3]-filters[3][1]+1)/poolSize[3][1]]
+        classifierInputShape=[self.batchSize,features[self.deep-1],(self.layers[-1].shape[2]-filters[self.deep-1][0]+1)/poolSize[self.deep-1][0],(self.layers[-1].shape[3]-filters[self.deep-1][1]+1)/poolSize[self.deep-1][1]]
         self.classifier=LogisticRegression(
-                input=self.layer3.output.flatten(2),
+                input=self.layers[-1].output.flatten(2),
                 n_in=np.prod(classifierInputShape[1:]),
                 n_out=categories
                 )
 
-        self.params=self.layer0.param+self.layer1.param+self.layer2.param+self.layer3.param+self.classifier.param
+        self.params=self.classifier.param
+        for i in xrange(self.deep):
+            self.params+=self.layers[i].param
         if static==False:
             self.params+=[self.wordVec]
 
@@ -222,19 +219,45 @@ class DRCNNModel(object):
         for item in self.classifier.param:
                 weights+=T.sum(T.sqr(item))
 
-        self.cost=self.classifier.negative_log_likelyhood(self.y)+1e-5*weights
+        self.cost=self.classifier.negative_log_likelyhood(self.y)
         self.errors=self.classifier.errors(self.y)
         
-        grads=T.grad(self.cost,self.params)
-        self.update=[
-                (param_i,param_i-self.lr*grad_i)
-                for (param_i,grad_i) in zip(self.params,grads)
-                ]
+        self.sgdUpdate=sgd(self.params,self.cost,self.lr)
         self.sgdMomentumUpdate=sgdMomentum(self.params,self.cost,self.lr)
         self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost)
         self.adadeltaMomentumUpdate=AdadeltaMomentumUpdate(params=self.params,cost=self.cost,stepSize=self.lr)
 
         print 'model %s constructed!'%name
+
+    def plotUpdate(self,updates):
+        '''
+        >>>get update info of each layer
+        >>>type updates: dict
+        >>>para updates: update dictionary
+        '''
+        maxdict=T.zeros(shape=(self.deep*2+2,))
+        mindict=T.zeros(shape=(self.deep*2+2,))
+        meandict=T.zeros(shape=(self.deep*2+2,))
+        
+        for i in xrange(self.deep):
+            updw=updates[self.layers[i].w]-self.layers[i].w
+            maxdict=T.set_subtensor(maxdict[2*i],T.max(updw))
+            mindict=T.set_subtensor(mindict[2*i],T.min(updw))
+            meandict=T.set_subtensor(meandict[2*i],T.mean(updw))
+            updb=updates[self.layers[i].b]-self.layers[i].b
+            maxdict=T.set_subtensor(maxdict[2*i+1],T.max(updb))
+            mindict=T.set_subtensor(mindict[2*i+1],T.min(updb))
+            meandict=T.set_subtensor(meandict[2*i+1],T.mean(updb))
+
+        updw=updates[self.classifier.w]-self.classifier.w
+        maxdict=T.set_subtensor(maxdict[self.deep*2],T.max(updw))
+        mindict=T.set_subtensor(mindict[self.deep*2],T.min(updw))
+        meandict=T.set_subtensor(meandict[self.deep*2],T.mean(updw))
+        updb=updates[self.classifier.b]-self.classifier.b
+        maxdict=T.set_subtensor(maxdict[self.deep*2+1],T.max(updb))
+        mindict=T.set_subtensor(mindict[self.deep*2+1],T.min(updb))
+        meandict=T.set_subtensor(meandict[self.deep*2+1],T.mean(updb))
+        return [maxdict,mindict,meandict]
 
     def train_validate_test(self,trainSet,validateSet,testSet,nEpoch):
         '''
@@ -265,7 +288,7 @@ class DRCNNModel(object):
         stepSize=T.dscalar('lr')
 
         sgdTrainModel=theano.function(
-                [index,learnRate],self.cost,updates=self.update,
+                [index,learnRate],self.cost,updates=self.sgdUpdate,
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
@@ -308,18 +331,19 @@ class DRCNNModel(object):
         print 'Validation Model Constructed!'
 
         testTrain=theano.function(
-                [index],self.errors,
+                [index],[self.cost,self.errors],
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]}
                 )
         print 'Test Model on Training Set Constructed!'
        
-        testLayer0Input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape((testSize,self.featureMaps,self.sentenceLen,self.wdim))
-        testLayer1Input=self.layer0.process(testLayer0Input,testSize)
-        testLayer2Input=self.layer1.process(testLayer1Input,testSize)
-        testLayer3Input=self.layer2.process(testLayer2Input,testSize)
-        testClassifierInput=self.layer3.process(testLayer3Input,testSize).flatten(2)
+        testInput=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape((testSize,self.featureMaps,self.sentenceLen,self.wdim))
+        testOutput=0
+        for i in xrange(self.deep):
+            testOutput=self.layers[i].process(testInput,testSize)
+            testInput=testOutput
+        testClassifierInput=testInput.flatten(2)
         testPredict=self.classifier.predictInstance(testClassifierInput)
         testError=T.mean(T.neq(testPredict,self.y))
         testModel=theano.function([self.x,self.y],testError)
@@ -343,13 +367,15 @@ class DRCNNModel(object):
             num=0
 
             for minBatch in np.random.permutation(range(trainBatches)):
-                #cost=adadeltaTrainModel(minBatch)
-                cost=adadeltaMomentumTrainModel(minBatch,steppingSize)
+                cost=adadeltaTrainModel(minBatch)
+                #cost=adadeltaMomentumTrainModel(minBatch,steppingSize)
                 x=float(epoch)+float(num+1)/float(trainBatches)-1
-                self.costValues.append({'x':x,'value':cost})
+                #self.costValues.append({'x':x,'value':cost})
                 if num%50==0:
-                    trainError=[testTrain(i) for i in xrange(trainBatches)]
-                    trainAcc=1-np.mean(trainError)
+                    trainResult=[testTrain(i) for i in xrange(trainBatches)]
+                    trainCost,trainError=np.mean(trainResult,axis=0)
+                    trainAcc=1-trainError
+                    self.costValues.append({'x':x,'value':trainCost})
                     validateError=[validateModel(i) for i in xrange(validateBatches)]
                     validateAcc=1-np.mean(validateError)
                     self.trainAccs.append({'x':x,'acc':trainAcc})
@@ -369,16 +395,18 @@ class DRCNNModel(object):
                         localOpt+=1
                         if localOpt>=5:
                             learningRate/=10
-                            steppingSize/=10
+                            steppingSize/=2
                             localOpt=0
                             print 'Learning Rate %f->%f'%(learningRate*10.,learningRate)
-                            print 'stepping Size %f->%f'%(steppingRate*10.,steppingRate)
+                            print 'stepping Size %f->%f'%(steppingSize*2.,steppingSize)
                     print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc*100.,bestTestAcc*100.,finalAcc*100.)
                 num+=1
 
             x=float(epoch)
-            trainError=[testTrain(i) for i in xrange(trainBatches)]
-            trainAcc=1-np.mean(trainError)
+            trainResult=[testTrain(i) for i in xrange(trainBatches)]
+            trainCost,trainError=np.mean(trainResult,axis=0)
+            trainAcc=1-trainError
+            self.costValues.append({'x':x,'value':trainCost})
             validateError=[validateModel(i) for i in xrange(validateBatches)]
             validateAcc=1-np.mean(validateError)
             self.trainAccs.append({'x':x,'acc':trainAcc})
@@ -398,10 +426,10 @@ class DRCNNModel(object):
                 localOpt+=1
                 if localOpt>=5:
                     learningRate/=10
-                    steppingSize/=10
+                    steppingSize/=2
                     localOpt=0
                     print 'Learning Rate %f->%f'%(learningRate*10.,learningRate)
-                    print 'Stepping Size %f->%f'%(steppingSize*10.,steppingSize)
+                    print 'Stepping Size %f->%f'%(steppingSize*2.,steppingSize)
             print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc*100.,bestTestAcc*100.,finalAcc*100.)
 
         self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}

@@ -221,7 +221,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 					validationSetY.append(validationSetY[extraIndex[i]])
 
 			trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
-			trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
+                        trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
 			validateSet['x']=np.array(validationSetX,dtype=theano.config.floatX)
 			validateSet['y']=np.array(validationSetY,dtype=theano.config.floatX)
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
@@ -233,16 +233,16 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
                             shape=(batchSize,1,maxLen,dimension),
                             filters=((3,300),(3,1),(3,1),(3,1)),
                             rfilter=((0,0),(3,1),(3,1)),
-                            features=(32,64,128,256),
-                            poolSize=((1,1),(1,1),(2,1),((maxLen-6)/2-2,1)),
+                            features=(178,178,178,178),
+                            poolSize=((1,1),(1,1),(1,1),(maxLen-8,1)),
                             time=1,categories=categories,
                             static=static,
-                            dropoutRate=(0.1,0.2,0.3,0.5),
+                            dropoutRate=(0,0,0,0),
                             learningRate=0.001,
                             name=name
                             )
                         
-			precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+			precision=network.train_validate_test(trainSet,validateSet,testSet,25)
 			network.save()
 			precisions.append(precision)
 		print 'Model '+name+' :Final Precision Rate %f%%'%(np.mean(precisions)*100.)
