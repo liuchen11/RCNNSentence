@@ -51,65 +51,42 @@ framwork2='''
    });
 });
 		</script>
-<script type="text/javascript">
+		<script type="text/javascript">
 $(function () {
     $('#container2').highcharts({
         chart: {
-            zoomType: 'x'
+            type: 'spline'
         },
         title: {
-            text: 'Value of Loss Function'
+            text: 'Accuracy in Train/Val/Test Set'
         },
-        subtitle: {},
         xAxis: {
-            title:{
+            title: {
                 text: 'Epoch'
-            },
-            minRange: %f
+            }
         },
         yAxis: {
             title: {
-                text: 'Value'
-            }
+                text: 'Cost'
+            },
         },
-        legend: {
-            enabled: false
-        },
-        plotOptions: {
-            area: {
-                fillColor: {
-                    linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1},
-                    stops: [
-                        [0, Highcharts.getOptions().colors[0]],
-                        [1, Highcharts.Color(Highcharts.getOptions().colors[0]).setOpacity(0).get('rgba')]
-                    ]
-                },
-                marker: {
-                    radius: 2
-                },
-                lineWidth: 1,
-                states: {
-                    hover: {
-                        lineWidth: 1
-                    }
-                },
-                threshold: null
-            }
+        tooltip: {
+            headerFormat: '<b>{series.name}</b><br>',
+            pointFormat: '{point.x: .2f}: {point.y:.2f} %%'
         },
 
-        series: [{
-            type: 'area',
-            name: 'Value',
-            pointInterval: %f,
-            pointStart: 0,
-            data: [
+        plotOptions: {
+            spline: {
+                marker: {
+                    enabled: true
+                }
+            }
+        },
 '''
 framwork3='''
-            ]
-        }]
-    });
+   });
 });
-          </script>
+	</script>
 
 	</head>
 	<body>
@@ -130,6 +107,7 @@ if __name__=='__main__':
 		exit(0)
 
 	fileName=sys.argv[1]
+	modelName=''
 	try:
 		index=fileName.find('__')
 		index=len(fileName) if index<0 else index
@@ -143,12 +121,14 @@ if __name__=='__main__':
 		sp0=fileName.find('_',sp+1)
 		sp1=fileName.find('_',sp0+1)
 		sp2=fileName.find('_',sp1+1)
+		sp3=fileName.find('_',index+2)
 		month=int(fileName[sp+1:sp0])
 		day=int(fileName[sp0+1:sp1])
 		hour=int(fileName[sp1+1:sp2])
 		minute=int(fileName[sp2+1:index])
+		modelName+=fileName[sp3+1:]
 		if len(sys.argv)==2:
-			outFileName='./charts/'+fileName[sp+1:index]+'.htm'
+			outFileName='./charts/'+fileName[sp+1:index]+'_'+modelName+'.htm'
 		else:
 			outFileName='./charts/'+sys.argv[2]
 	except:
@@ -167,8 +147,8 @@ if __name__=='__main__':
 	bestValAcc=round(result['bestValAcc']*100.,2)
 	bestTestAcc=round((1-result['minError'])*100.,2)
 
-	subtitle='%i/%i %i:%i, Final: %f%%, BestVal: %f%% BestTest: %f%%'%(
-		month,day,hour,minute,finalAcc,bestValAcc,bestTestAcc)
+	subtitle='%s %i/%i %i:%i, Final: %f%%, BestVal: %f%% BestTest: %f%%'%(
+		modelName,month,day,hour,minute,finalAcc,bestValAcc,bestTestAcc)
 	print subtitle
 
 	with open(outFileName,'w') as fopen:
@@ -210,12 +190,19 @@ if __name__=='__main__':
         }]
 			''')
 		minInterval=costValue[1]['x']-costValue[0]['x']
-		fopen.write(framwork2%(minInterval,minInterval))
+		fopen.write(framwork2)
+		fopen.write('''
+        series: [{
+          name:'LossFunc',
+          data:[
+		''')
 		for i in xrange(len(costValue)):
-			if i+1==len(costValue):
-				fopen.write(str(costValue[i]['value'])+'\n')
+			if i+1!=len(costValue):
+				fopen.write('          ['+str(costValue[i]['x'])+', '+str(costValue[i]['value']*100.)+'],\n')
 			else:
-				fopen.write(str(costValue[i]['value'])+',')
-			if i%100==0:
-				fopen.write('\n\t')
+				fopen.write('          ['+str(costValue[i]['x'])+', '+str(costValue[i]['value']*100.)+']\n')
+		fopen.write('''
+          ]
+        }]
+			''')
 		fopen.write(framwork3)
