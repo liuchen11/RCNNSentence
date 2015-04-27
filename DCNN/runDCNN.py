@@ -1,7 +1,7 @@
 import sys,warnings
 import numpy as np
 
-from cnnModel import *
+from dcnnModel import *
 from loadWordVec import *
 
 warnings.filterwarnings('ignore')
@@ -65,7 +65,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 	>>>type static:bool
 	>>>para static:whether or not to use static wordVec
 	>>>type name:str
-	>>>para name:model's name
+	>>>para name:the name of the model
 	'''
 	categories=config['classes']
 	sets=config['all']
@@ -112,6 +112,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 		if len(validation)==0:				#No ValidationSet
 			newTrainSetX=[];newValidationSetX=[]
 			newTrainSetY=[];newValidationSetY=[]
+			index=0
 
 			validateEachType=int(len(trainSetX)*0.1/categories)
 			validationType=[]
@@ -127,19 +128,9 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 				else:
 					newTrainSetX.append(trainSetX[i])
 					newTrainSetY.append(trainSetY[i])
-			# index=0
-			# for i in np.random.permutation(range(len(trainSetX))):
-			# 	if index<len(trainSetX)*0.9:
-			# 		newTrainSetX.append(trainSetX[i])
-			# 		newTrainSetY.append(trainSetY[i])
-			# 	else:
-			# 		newValidationSetX.append(trainSetX[i])
-			# 		newValidationSetY.append(trainSetY[i])
-			# 	index+=1
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 				
-
 		if len(trainSetX)%batchSize>0:
 			extraNum=batchSize-len(trainSetX)%batchSize
 			extraIndex=np.random.permutation(range(len(trainSetX)))
@@ -154,13 +145,6 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 				validationSetX.append(validationSetX[extraIndex[i]])
 				validationSetY.append(validationSetY[extraIndex[i]])
 
-		#trainSize=len(trainSetX)
-		#validateSize=trainSize/5-(trainSize/5)%batchSize
-		#validateIndex=np.random.permutation(range(trainSize))
-		#for i in xrange(validateSize):
-		#	validateSetX.append(trainSetX[validateIndex[i]])
-		#	validateSetY.append(trainSetY[validateIndex[i]])
-
 		trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
 		trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
 		validateSet['x']=np.array(validationSetX,dtype=theano.config.floatX)
@@ -168,18 +152,19 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 		testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-		network=CNNModel(
-			wordMatrix=vectors,
-			shape=(batchSize,1,maxLen,dimension),
-			filters=(3,4,5),
-			rfilter=(5,1),
-			features=(400,),
-			time=5,categories=categories,
-			static=static,
-			dropoutRate=(0.5,),
-			learningRate=0.01,
-			name=name
-		)
+                network=DRCNNModel(
+                    wordMatrix=vectors,
+                    shape=(batchSize,1,maxLen,dimension),
+                    filters=((3,300),(3,1),(3,1),(3,1)),
+                    rfilter=((0,0),(3,1),(3,1),(3,1),(3,1)),
+                    features=(512,256,128,128,128),
+                    poolSize=((maxLen-2,1),),
+                    time=1,categories=categories,
+                    static=static,
+                    dropoutRate=(0.5,0.5,0),
+                    learningRate=0.001,
+                    name=name
+                    )
 
 		precision=network.train_validate_test(trainSet,validateSet,testSet,10)
 		network.save()
@@ -201,7 +186,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			#No ValidationSet
 			newTrainSetX=[];newValidationSetX=[]
 			newTrainSetY=[];newValidationSetY=[]
-
+			
 			validateEachType=int(len(trainSetX)*0.1/categories)
 			validationType=[]
 			for i in xrange(categories):
@@ -217,15 +202,6 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 					newTrainSetX.append(trainSetX[i])
 					newTrainSetY.append(trainSetY[i])
 
-			# index=0
-			# for i in np.random.permutation(range(len(trainSetX))):
-			# 	if index<len(trainSetX)*0.9:
-			# 		newTrainSetX.append(trainSetX[i])
-			# 		newTrainSetY.append(trainSetY[i])
-			# 	else:
-			# 		newValidationSetX.append(trainSetX[i])
-			# 		newValidationSetY.append(trainSetY[i])
-			# 	index+=1
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 
@@ -245,26 +221,27 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 					validationSetY.append(validationSetY[extraIndex[i]])
 
 			trainSet['x']=np.array(trainSetX,dtype=theano.config.floatX)
-			trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
+                        trainSet['y']=np.array(trainSetY,dtype=theano.config.floatX)
 			validateSet['x']=np.array(validationSetX,dtype=theano.config.floatX)
 			validateSet['y']=np.array(validationSetY,dtype=theano.config.floatX)
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
+    
+                        network=DRCNNModel(
+                            wordMatrix=vectors,
+                            shape=(batchSize,1,maxLen,dimension),
+                            filters=((3,300),(3,1),(3,1),(3,1),(3,1)),
+                            rfilter=((0,0),(3,1),(3,1),(3,1),(3,1)),
+                            features=(256,128,128,128,64),
+                            poolSize=((2,1),(1,1),(2,1),(1,1),(((maxLen-2)/2-4)/2-4,1)),
+                            time=1,categories=categories,
+                            static=static,
+                            dropoutRate=(0,0,0,0),
+                            learningRate=0.001,
+                            name=name
+                            )
 
-			network=CNNModel(
-				wordMatrix=vectors,
-				shape=(batchSize,1,maxLen,dimension),
-				filters=(3,4,5),
-				rfilter=(5,1),
-				features=(100,),
-				time=1,categories=categories,
-				static=static,
-				dropoutRate=(0.5,),
-				learningRate=0.01,
-				name=name
-			)
-
-			precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+			precision=network.train_validate_test(trainSet,validateSet,testSet,25)
 			network.save()
 			precisions.append(precision)
 		print 'Model '+name+' :Final Precision Rate %f%%'%(np.mean(precisions)*100.)
@@ -275,7 +252,7 @@ if __name__=='__main__':
 	mode=0
 	dataFile=''
 	vecFile=''
-	name=''
+	name='Model'
 
 	for i in xrange(len(sys.argv)):
 		if i==0:
@@ -312,18 +289,23 @@ if __name__=='__main__':
 	saveFile='../Models/'+name
 	fwrite=open(saveFile,'w')
 	cmd='python'
-        for item in sys.argv:
-                cmd+=' '+item
-        fwrite.write(cmd+'\n')
-	fwrite.write('##########runRCNN.py############\n')
-	with open('runCNN.py','r') as fopen:
+	for item in sys.argv:
+		cmd+=' '+item
+	fwrite.write(cmd+'\n')
+	fwrite.write('##########runDCNN.py############\n')
+	with open('runDCNN.py','r') as fopen:
 		for line in fopen:
 			fwrite.write(line)
-	fwrite.write('##########cnnModel.py#############\n')
-	with open('cnnModel.py','r') as fopen:
+	fwrite.write('##########dcnnModel.py#############\n')
+	with open('dcnnModel.py','r') as fopen:
+		for line in fopen:
+			fwrite.write(line)
+	fwrite.write('#########recurrentConvLayer.py###########\n')
+	with open('recurrentConvLayer.py','r') as fopen:
 		for line in fopen:
 			fwrite.write(line)
 	fwrite.close()
 	print 'model '+name+' saved!'
+
 	sentences,vocab,config,vectors,wordIndex=loadDatas(dataFile=dataFile,wordVecFile=vecFile,dimension=300,rand=rand)
 	parseConfig(sentences,vocab,config,vectors,wordIndex,static,name)

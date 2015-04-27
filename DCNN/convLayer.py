@@ -5,6 +5,9 @@ import theano.tensor as T
 from theano.tensor.nnet import conv
 from theano.tensor.signal import downsample
 
+def ReLU(x):
+    return T.switch(x>0,x,0)
+
 class ConvPool(object):
 
 	def __init__(self, rng, input,shape,filters,pool):
@@ -41,7 +44,8 @@ class ConvPool(object):
 
 		self.w=theano.shared(
 			np.asarray(
-				rng.uniform(low=-w_bound,high=w_bound,size=filters),
+                                #rng.uniform(low=-0.01,high=0.01,size=filters),
+				rng.normal(loc=0,scale=np.sqrt(2./inflow),size=filters),
 				dtype=theano.config.floatX
 				),
 			borrow=True
@@ -49,12 +53,12 @@ class ConvPool(object):
 
 		#bias
 		self.b=theano.shared(
-			value=np.zeros((filters[0]),dtype=theano.config.floatX),
+			value=np.zeros((filters[0],),dtype=theano.config.floatX),
 			borrow=True
 			)
 
 		#build up convolutional layer
-                conv_out=conv.conv2d(
+		conv_out=conv.conv2d(
 			input=input,
 			filters=self.w,
 			filter_shape=filters,
@@ -62,13 +66,13 @@ class ConvPool(object):
 			)
 
 		#build up pooling layer
-                pool_out=downsample.max_pool_2d(
+		pool_out=downsample.max_pool_2d(
 			input=conv_out,
 			ds=pool,
 			ignore_border=True
 			)
 
-		self.output=T.tanh(pool_out+self.b.dimshuffle('x',0,'x','x'))
+		self.output=ReLU(pool_out+self.b.dimshuffle('x',0,'x','x'))
 
 		self.param=[self.w,self.b]
 
@@ -81,7 +85,7 @@ class ConvPool(object):
 		>>>type batchSize: int
 		>>>para batchSize: minibatch size
 		'''
-		shape=(batchSize,1,self.shape[2],self.shape[3])
+		shape=(batchSize,self.shape[1],self.shape[2],self.shape[3])
 
 		conv_out=conv.conv2d(
 			input=data,
@@ -94,7 +98,7 @@ class ConvPool(object):
 			ds=self.pool,
 			ignore_border=True
 		)
-		output=T.tanh(pool_out+self.b.dimshuffle('x',0,'x','x'))
+		output=ReLU(pool_out+self.b.dimshuffle('x',0,'x','x'))
 		return output
 
 def dropoutFunc(rng,value,p):
@@ -121,4 +125,4 @@ class DropoutConvPool(ConvPool):
 
 	def process(self,data,batchSize):
 		output=ConvPool.process(self,data,batchSize)
-		return output*self.dropoutRate
+		return output*(1.0-self.dropoutRate)

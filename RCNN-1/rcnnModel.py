@@ -154,8 +154,7 @@ class RCNNModel(object):
 		if static==False:
 			self.params+=[self.wordVec]
 
-
-		self.cost=self.layer1.negative_log_likelyhood(self.y)+1e-4*T.sqrt(weights) #Weight Decay
+		self.cost=self.layer1.negative_log_likelyhood(self.y) #Weight Decay
 		self.errors=self.layer1.errors(self.y)
 
 		#for key in self.params:
@@ -207,7 +206,7 @@ class RCNNModel(object):
 		print 'training model constructed!'
 
 		testTrain=theano.function(
-		[index],self.errors,
+		[index],[self.cost,self.errors],
 		givens={
 		self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
 		self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]})
@@ -234,7 +233,8 @@ class RCNNModel(object):
 		epoch=0
 		iteration=0
 		maxIteration=10000
-		minError=1.0
+		maxEpoch=5.0
+                minError=1.0
 		rate=0.01
 		bestValPrecision=0.0
 		finalPrecision=0.0
@@ -244,23 +244,19 @@ class RCNNModel(object):
 		self.costValue=[]
 		self.result={}
 
-		while epoch<nEpoch and iteration<maxIteration:
+		while epoch<nEpoch and epoch<maxEpoch:
 			epoch+=1
 			num=0
 			for minBatch in np.random.permutation(range(trainBatches)):
 				cost=trainModel(minBatch)				#set zero func
 				x=float(epoch)+float(num+1)/float(trainBatches)-1
-				self.costValue.append({'x':x,'value':cost})
+				#self.costValue.append({'x':x,'value':cost})
 				if num%50==0:
-					trainError=[
-						testTrain(i)
-						for i in xrange(trainBatches)
-					]
-					trainPrecision=1-np.mean(trainError)
-					validateError=[
-						validateModel(i)
-						for i in xrange(validateBatches)
-					]
+					trainResult=[testTrain(i) for i in xrange(trainBatches)]
+                                        trainCost,trainError=np.mean(trainResult,axis=0)
+					trainPrecision=1-trainError
+                                        self.costValue.append({'x':x,'value':trainCost})
+					validateError=[validateModel(i) for i in xrange(validateBatches)]
 					validatePrecision=1-np.mean(validateError)
 					print 'epoch=%i,num=%i,train precision=%f%%, validation precision=%f%%'%(epoch,num,trainPrecision*100.,validatePrecision*100.)
 					self.trainAcc.append({'x':x,'acc':trainPrecision})
@@ -272,16 +268,16 @@ class RCNNModel(object):
 						finalPrecision=testPrecision
 						bestValPrecision=validatePrecision
 						print 'testing precision=%f%%'%(testPrecision*100.)
-						self.testAcc.append({'x':x,'acc':testPrecision})
+						maxEpoch=max(maxEpoch,epoch*1.5)
+                                                self.testAcc.append({'x':x,'acc':testPrecision})
 					print 'bestValPrecision=%f%%'%(bestValPrecision*100.)
 				num+=1
 
 			x=float(epoch)
-			trainError=[
-				testTrain(i)
-				for i in xrange(trainBatches)
-			]
-			trainPrecision=1-np.mean(trainError)
+			trainResult=[testTrain(i) for i in xrange(trainBatches)]
+                        trainCost,trainError=np.mean(trainResult,axis=0)
+			trainPrecision=1-trainError
+                        self.costValue.append({'x':x,'value':trainCost})
 			validateError=[
 				validateModel(i)
 				for i in xrange(validateBatches)
@@ -297,6 +293,7 @@ class RCNNModel(object):
 				finalPrecision=testPrecision
 				bestValPrecision=validatePrecision
 				print 'testing precision=%f%%'%(testPrecision*100.)
+                                maxEpoch=max(maxEpoch,epoch*1.5)
 				self.testAcc.append({'x':x,'acc':testPrecision})
 			print 'bestValPrecision=%f%%'%(bestValPrecision*100.)
 			print 'bestTestPrecision=%f%%, finalPrecision=%f%%'%((1-minError)*100.,finalPrecision*100.)

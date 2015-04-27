@@ -201,7 +201,7 @@ class CNNModel(object):
 		print 'training model constructed!'
 
 		testTrain=theano.function(
-		[index],self.errors,
+		[index],[self.cost,self.errors],
 		givens={
 		self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
 		self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]})
@@ -244,17 +244,13 @@ class CNNModel(object):
 			for minBatch in np.random.permutation(range(trainBatches)):
 				cost=trainModel(minBatch)				#set zero func
 				x=float(epoch)+float(num+1)/float(trainBatches)-1
-				self.costValue.append({'x':x,'value':cost})
+				#self.costValue.append({'x':x,'value':cost})
 				if num%50==0:
-					trainError=[
-						testTrain(i)
-						for i in xrange(trainBatches)
-					]
-					trainPrecision=1-np.mean(trainError)
-					validateError=[
-						validateModel(i)
-						for i in xrange(validateBatches)
-					]
+					trainResult=[testTrain(i) for i in xrange(trainBatches)]
+                                        trainCost,trainError=np.mean(trainResult,axis=0)
+					trainPrecision=1-trainError
+                                        self.costValue.append({'x':x,'value':trainCost})
+					validateError=[validateModel(i) for i in xrange(validateBatches)]
 					validatePrecision=1-np.mean(validateError)
 					print 'epoch=%i,num=%i,train precision=%f%%, validation precision=%f%%'%(epoch,num,trainPrecision*100.,validatePrecision*100.)
 					self.trainAcc.append({'x':x,'acc':trainPrecision})
@@ -271,15 +267,11 @@ class CNNModel(object):
 				num+=1
 
 			x=float(epoch)
-			trainError=[
-				testTrain(i)
-				for i in xrange(trainBatches)
-			]
-			trainPrecision=1-np.mean(trainError)
-			validateError=[
-				validateModel(i)
-				for i in xrange(validateBatches)
-			]
+			trainResult=[testTrain(i) for i in xrange(trainBatches)]
+                        trainCost,trainError=np.mean(trainResult,axis=0)
+                        trainPrecision=1-trainError
+                        self.costValue.append({'x':x,'value':trainCost})
+			validateError=[validateModel(i) for i in xrange(validateBatches)]
 			validatePrecision=1-np.mean(validateError)
 			print 'epoch=%i,train precision=%f%%, validation precision=%f%%'%(epoch,trainPrecision*100.,validatePrecision*100.)
 			self.trainAcc.append({'x':x,'acc':trainPrecision})

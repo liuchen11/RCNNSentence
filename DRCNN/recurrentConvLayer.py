@@ -123,7 +123,7 @@ class RecurrentConvLayer(object):
 		>>>type batchSize: int
 		>>>para batchSize: batch size
 		'''
-		shape=(batchSize,1,self.shape[2],self.shape[3])
+		shape=(batchSize,self.shape[1],self.shape[2],self.shape[3])
 		layer_size=(batchSize,self.filters[0],shape[2]-self.filters[2]+1,shape[3]-self.filters[3]+1)
 
 		conv_input=conv.conv2d(

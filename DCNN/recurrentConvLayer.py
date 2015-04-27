@@ -73,7 +73,7 @@ class RecurrentConvLayer(object):
 
 		print 'initialize the weight'
 
-		state=ReLU(conv_input+self.b_r.dimshuffle('x',0,'x','x'))
+		state=conv_input+self.b_r.dimshuffle('x',0,'x','x')
 		axis2Padleft=rfilter[2]/2;axis2Padright=(rfilter[2]-1)/2
 		axis3Padleft=rfilter[3]/2;axis3Padright=(rfilter[3]-1)/2
 		axis2Padright=layer_size[2]+rfilter[2]-1 if axis2Padright==0 else -axis2Padright

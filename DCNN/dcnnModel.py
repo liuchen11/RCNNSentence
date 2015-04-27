@@ -152,7 +152,7 @@ class DRCNNModel(object):
         >>>para features: num of feature maps in each layer
         >>>type poolSize: tuple or list of 2-len tuple or list
         >>>para poolSize: pooling size of each layer
-        >>>type time: tuple or list of int
+        >>>type time: int
         >>>para time: the iteration times of recurrent connection
         >>>type categories: int
         >>>para categories: target categories
@@ -174,12 +174,12 @@ class DRCNNModel(object):
         
         self.x=T.matrix('x')
         self.y=T.ivector('y')
-        self.lr=T.dscalar('lr')
+        self.lr=T.fscalar('lr')
 
         self.wordVec=theano.shared(wordMatrix,name='wordVec')
         input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape(shape)
 
-        self.deep=min(len(features),len(filters),len(poolSize),len(time))
+        self.deep=min(len(features),len(filters),len(poolSize))
         self.layers=[]
         print 'This is a network of %i layer(s)'%self.deep
 
@@ -192,28 +192,14 @@ class DRCNNModel(object):
                 layerSize=[self.batchSize,features[i-1],(self.layers[-1].shape[2]-filters[i-1][0]+1)/poolSize[i-1][0],(self.layers[-1].shape[3]-filters[i-1][1]+1)/poolSize[i-1][1]]
                 layerInput=self.layers[-1].output
                 fmapIn=features[i-1]
-            if time[i]<=0:
-                newlayer=DropoutConvPool(
-                        rng=rng,
-                        input=layerInput,
-                        shape=layerSize,
-                        filters=[features[i],fmapIn,filters[i][0],filters[i][1]],
-                        pool=poolSize[i],
-                        dropout=dropoutRate[i]
-                        )
-            else:
-                newlayer=DropoutRecurrentConvLayer(
-                        rng=rng,
-                        input=layerInput,
-                        shape=layerSize,
-                        filters=[features[i],fmapIn,filters[i][0],filters[i][1]],
-                        rfilter=[features[i],features[i],rfilter[i][0],rfilter[i][1]],
-                        alpha=0.001,beta=0.75,
-                        N=(int)(features[i]/8+1),
-                        time=time[i],
-                        pool=poolSize[i],
-                        dropout=dropoutRate[i]
-                        )
+            newlayer=DropoutConvPool(
+                    rng=rng,
+                    input=layerInput,
+                    shape=layerSize,
+                    filters=[features[i],fmapIn,filters[i][0],filters[i][1]],
+                    pool=poolSize[i],
+                    dropout=dropoutRate[i]
+                    )
             self.layers.append(newlayer)
 
         classifierInputShape=[self.batchSize,features[self.deep-1],(self.layers[-1].shape[2]-filters[self.deep-1][0]+1)/poolSize[self.deep-1][0],(self.layers[-1].shape[3]-filters[self.deep-1][1]+1)/poolSize[self.deep-1][1]]
@@ -240,6 +226,11 @@ class DRCNNModel(object):
         self.sgdMomentumUpdate=sgdMomentum(self.params,self.cost,self.lr)
         self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost)
         self.adadeltaMomentumUpdate=AdadeltaMomentumUpdate(params=self.params,cost=self.cost,stepSize=self.lr)
+
+        self.sgdDelta=self.plotUpdate(self.sgdUpdate)
+        self.sgdMomentumDelta=self.plotUpdate(self.sgdMomentumUpdate)
+        self.adadeltaDelta=self.plotUpdate(self.adadeltaUpdate)
+        self.adadeltaMomentumDelta=self.plotUpdate(self.adadeltaMomentumUpdate)
 
         print 'model %s constructed!'%name
 
@@ -294,11 +285,11 @@ class DRCNNModel(object):
         validateBatches=validateSize/self.batchSize
 
         index=T.iscalar('index')
-        learnRate=T.dscalar('lr')
-        stepSize=T.dscalar('lr')
+        learnRate=T.fscalar('lr')
+        stepSize=T.fscalar('lr')
 
         sgdTrainModel=theano.function(
-                [index,learnRate],self.cost,updates=self.sgdUpdate,
+                [index,learnRate],[self.cost,self.sgdDelta[0],self.sgdDelta[1],self.sgdDelta[2]],updates=self.sgdUpdate,
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
@@ -307,7 +298,7 @@ class DRCNNModel(object):
         print 'SGD TrainModel Constructed!'
 
         sgdMomentumTrainModel=theano.function(
-                [index,learnRate],self.cost,updates=self.sgdMomentumUpdate,
+                [index,learnRate],[self.cost,self.sgdMomentumDelta[0],self.sgdMomentumDelta[1],self.sgdMomentumDelta[2]],updates=self.sgdMomentumUpdate,
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
@@ -316,7 +307,7 @@ class DRCNNModel(object):
         print 'SGD-Momentum TrainModel Constructed!'
 
         adadeltaTrainModel=theano.function(
-                [index],self.cost,updates=self.adadeltaUpdate,
+                [index],[self.cost,self.adadeltaDelta[0],self.adadeltaDelta[1],self.adadeltaDelta[2]],updates=self.adadeltaUpdate,
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]}
@@ -324,7 +315,7 @@ class DRCNNModel(object):
         print 'Adadelta TrainModel Constructed!'
 
         adadeltaMomentumTrainModel=theano.function(
-                [index,stepSize],self.cost,updates=self.adadeltaMomentumUpdate,
+                [index,stepSize],[self.cost,self.adadeltaMomentumDelta[0],self.adadeltaMomentumDelta[1],self.adadeltaMomentumDelta[2]],updates=self.adadeltaMomentumUpdate,
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
                     self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
@@ -378,10 +369,14 @@ class DRCNNModel(object):
             num=0
 
             for minBatch in np.random.permutation(range(trainBatches)):
-                cost=adadeltaTrainModel(minBatch)
+                cost,dmax,dmin,dmean=adadeltaTrainModel(minBatch)
                 #cost=adadeltaMomentumTrainModel(minBatch,steppingSize)
                 x=float(epoch)+float(num+1)/float(trainBatches)-1
                 #self.costValues.append({'x':x,'value':cost})
+                #if num%10==0:
+                #    print 'max:',dmax
+                #    print 'min:',dmin
+                #    print 'mean:',dmean
                 if num%50==0:
                     trainResult=[testTrain(i) for i in xrange(trainBatches)]
                     trainCost,trainError=np.mean(trainResult,axis=0)
@@ -391,7 +386,7 @@ class DRCNNModel(object):
                     validateAcc=1-np.mean(validateError)
                     self.trainAccs.append({'x':x,'acc':trainAcc})
                     self.validateAccs.append({'x':x,'acc':validateAcc})
-                    print'Epoch=%i,TrainAcc=%f%%,ValidateAcc=%f%%'%(epoch,trainAcc*100.,validateAcc*100.)
+                    print'Epoch=%i,Num=%i,TrainAcc=%f%%,ValidateAcc=%f%%'%(epoch,num,trainAcc*100.,validateAcc*100.)
 
                     if validateAcc>bestValAcc:
                         testError=testModel(testX,testY)
@@ -402,7 +397,7 @@ class DRCNNModel(object):
                         self.testAccs.append({'x':x,'acc':testAcc})
                         print 'TestAcc=%f%%'%(testAcc*100.)
                         localOpt=0
-                        maxEpoch=max(maxEpoch,1.5*epoch)
+                        maxEpoch=max(maxEpoch,epoch*1.5)
                     else:
                         localOpt+=1
                         if localOpt>=5:
@@ -434,7 +429,7 @@ class DRCNNModel(object):
                 self.testAccs.append({'x':x,'acc':testAcc})
                 print 'TestAcc=%f%%'%(testAcc*100.)
                 localOpt=0
-                maxEpoch=max(1.5*epoch,maxEpoch)
+                maxEpoch=max(maxEpoch,epoch*1.5)
             else:
                 localOpt+=1
                 if localOpt>=5:

@@ -74,7 +74,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 	test=config['test']
 	cross=config['cross']
 	dimension=len(vectors[0])
-	batchSize=25
+	batchSize=50
 
 	maxLen=0
 	for sentence in sentences:
@@ -173,14 +173,14 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			filters=(3,4,5),
 			rfilter=(5,1),
 			features=(80,),
-			time=1,categories=categories,
+			time=2,categories=categories,
 			static=static,
 			dropoutRate=(0.5,),
 			learningRate=0.01,
 			name=name
 		)
 
-		precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+		precision=network.train_validate_test(trainSet,validateSet,testSet,25)
 		network.save()
 		print 'Model '+name+' :Final Precision Rate %f%%'%(precision*100.)
 	else:
@@ -255,15 +255,15 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 				shape=(batchSize,1,maxLen,dimension),
 				filters=(3,4,5),
 				rfilter=(5,1),
-				features=(80,),
-				time=1,categories=categories,
+				features=(100,),
+				time=5,categories=categories,
 				static=static,
 				dropoutRate=(0.5,),
 				learningRate=0.01,
 				name=name
 			)
 
-			precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+			precision=network.train_validate_test(trainSet,validateSet,testSet,25)
 			network.save()
 			precisions.append(precision)
 		print 'Model '+name+' :Final Precision Rate %f%%'%(np.mean(precisions)*100.)

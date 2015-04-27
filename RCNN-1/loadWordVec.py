@@ -36,12 +36,12 @@ def getWordVec(configFileName,vecFileName):
 	for word in data[1]:
 		if word not in wordVec:
 			num+=1
-			wordVec[word]=np.random.uniform(-0.25,0.25,dimension)
+			wordVec[word]=np.random.uniform(-0.25,0.25,dimension).astype(theano.config.floatX)
 
 	vocabSize=len(data[1])
-	vectors=np.zeros(shape=(vocabSize+1,dimension))
+	vectors=np.zeros(shape=(vocabSize+1,dimension),dtype=theano.config.floatX)
 	wordIndex={}
-	vectors[0]=np.zeros(dimension)
+	vectors[0]=np.zeros(dimension,dtype=theano.config.floatX)
 	index=1
 	for word in wordVec:
 		vectors[index]=wordVec[word]
@@ -57,12 +57,12 @@ def getRandWordVec(configFileName,dimension):
 	data=cPickle.load(open(configFileName,'rb'))
 	wordVec={}
 	for word in data[1]:
-		wordVec[word]=np.random.uniform(-0.25,0.25,dimension)
+		wordVec[word]=np.random.uniform(-0.25,0.25,dimension).astype(theano.config.floatX)
 
 	vocabSize=len(data[1])
-	vectors=np.zeros(shape=(vocabSize+1,dimension))
+	vectors=np.zeros(shape=(vocabSize+1,dimension),dtype=theano.config.floatX)
 	wordIndex={}
-	vectors[0]=np.zeros(dimension)
+	vectors[0]=np.zeros(dimension,dtype=theano.config.floatX)
 	index=1
 	for word in wordVec:
 		vectors[index]=wordVec[word]
