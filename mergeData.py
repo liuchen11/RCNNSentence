@@ -51,4 +51,4 @@ if __name__=='__main__':
 
         epoch=maxEpoch
 
-    cPickle.dump([result,trainAcc,testAcc,costValue],open(outputfile,'wb'))
+    cPickle.dump([result,trainAcc,validateAcc,testAcc,costValue],open(outputfile,'wb'))

@@ -72,7 +72,7 @@ $(function () {
         },
         tooltip: {
             headerFormat: '<b>{series.name}</b><br>',
-            pointFormat: '{point.x: .2f}: {point.y:.2f} %%'
+            pointFormat: '{point.x: .2f}: {point.y:.4f}'
         },
 
         plotOptions: {
@@ -198,9 +198,9 @@ if __name__=='__main__':
 		''')
 		for i in xrange(len(costValue)):
 			if i+1!=len(costValue):
-				fopen.write('          ['+str(costValue[i]['x'])+', '+str(costValue[i]['value']*100.)+'],\n')
+				fopen.write('          ['+str(costValue[i]['x'])+', '+str(costValue[i]['value'])+'],\n')
 			else:
-				fopen.write('          ['+str(costValue[i]['x'])+', '+str(costValue[i]['value']*100.)+']\n')
+				fopen.write('          ['+str(costValue[i]['x'])+', '+str(costValue[i]['value'])+']\n')
 		fopen.write('''
           ]
         }]
