@@ -41,14 +41,16 @@ def getWordVec(configFileName,vecFileName):
 	vocabSize=len(data[1])
 	vectors=np.zeros(shape=(vocabSize+1,dimension),dtype=theano.config.floatX)
 	wordIndex={}
+        indexWord={}
 	vectors[0]=np.zeros(dimension,dtype=theano.config.floatX)
 	index=1
 	for word in wordVec:
 		vectors[index]=wordVec[word]
 		wordIndex[word]=index
+                indexWord[index]=word
 		index+=1
 	print 'word not found: ',num
-	return vectors,wordIndex
+	return vectors,wordIndex,indexWord
 
 def getRandWordVec(configFileName,dimension):
 	'''
@@ -62,10 +64,12 @@ def getRandWordVec(configFileName,dimension):
 	vocabSize=len(data[1])
 	vectors=np.zeros(shape=(vocabSize+1,dimension),dtype=theano.config.floatX)
 	wordIndex={}
+        indexWord={}
 	vectors[0]=np.zeros(dimension,dtype=theano.config.floatX)
 	index=1
 	for word in wordVec:
 		vectors[index]=wordVec[word]
 		wordIndex[word]=index
+                indexWord[index]=word
 		index+=1
-	return vectors,wordIndex
+	return vectors,wordIndex,indexWord

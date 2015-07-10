@@ -70,7 +70,7 @@ def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
 class RCNNModel(object):
 	
 	def __init__(self,wordMatrix,shape,filters,rfilter,features,time,
-			categories,static,dropoutRate,learningRate,name):
+			categories,static,dropoutRate,learningRate,useVal,name):
 		'''
 		>>>initalize the model
 
@@ -94,12 +94,16 @@ class RCNNModel(object):
 		>>>para dropoutRate: dropout rate of each layer
 		>>>type learningRate: float
 		>>>para learningRate: learning rate
+                >>>type useVal:bool
+                >>>para useVal:whether or not use validation set
 		>>>type name: str
 		>>>para name: the name of the model
 		'''
 		self.learningRate=learningRate
 		self.static=static
 		self.name=name
+                self.useVal=useVal
+                self.categories=categories
 
 		rng=np.random.RandomState(2011010539)
 		self.batchSize,featureMaps,self.sentenceLen,self.dimension=shape
@@ -227,12 +231,10 @@ class RCNNModel(object):
 		testLayer1Input=T.concatenate(testLayer0Output,1)
 		testPredict=self.layer1.predictInstance(testLayer1Input)
 		testError=T.mean(T.neq(testPredict,self.y))
-		testModel=theano.function([self.x,self.y],testError)
+		testModel=theano.function([self.x,self.y],[testPredict,testError])
 		print 'testing model constructed!'
 
 		epoch=0
-		iteration=0
-		maxIteration=10000
 		maxEpoch=5.0
                 minError=1.0
 		rate=0.01
@@ -242,9 +244,11 @@ class RCNNModel(object):
 		self.validateAcc=[]
 		self.testAcc=[]
 		self.costValue=[]
-		self.result={}
-
-		while epoch<nEpoch and epoch<maxEpoch:
+		self.result={'minError':1.00,'finalAcc':0.00,'bestValAcc':0.00}
+                testPredict=np.zeros(shape=(testSize,),dtype='int32')
+                testMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+		
+                while epoch<nEpoch and (epoch<maxEpoch or not self.useVal):
 			epoch+=1
 			num=0
 			for minBatch in np.random.permutation(range(trainBatches)):
@@ -256,21 +260,34 @@ class RCNNModel(object):
                                         trainCost,trainError=np.mean(trainResult,axis=0)
 					trainPrecision=1-trainError
                                         self.costValue.append({'x':x,'value':trainCost})
-					validateError=[validateModel(i) for i in xrange(validateBatches)]
-					validatePrecision=1-np.mean(validateError)
-					print 'epoch=%i,num=%i,train precision=%f%%, validation precision=%f%%'%(epoch,num,trainPrecision*100.,validatePrecision*100.)
-					self.trainAcc.append({'x':x,'acc':trainPrecision})
-					self.validateAcc.append({'x':x,'acc':validatePrecision})
-					if validatePrecision>bestValPrecision:
-						testError=testModel(testX,testY)
-						testPrecision=1-testError
-						minError=min(minError,testError)					
-						finalPrecision=testPrecision
-						bestValPrecision=validatePrecision
-						print 'testing precision=%f%%'%(testPrecision*100.)
-						maxEpoch=max(maxEpoch,epoch*1.5)
+	        			self.trainAcc.append({'x':x,'acc':trainPrecision})
+                                        if self.useVal:
+                                                validateError=[validateModel(i) for i in xrange(validateBatches)]
+					        validatePrecision=1-np.mean(validateError)
+        					print 'epoch=%i,num=%i,train precision=%f%%, validation precision=%f%%'%(epoch,num,trainPrecision*100.,validatePrecision*100.)
+		        			self.validateAcc.append({'x':x,'acc':validatePrecision})
+			        		if validatePrecision>bestValPrecision:
+				        		testPredict,testError=testModel(testX,testY)
+                                                        testMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+                                                        assert len(testPredict)==len(testY)
+                                                        for case in xrange(len(testY)):
+                                                            testMatrix[testY[case],testPredict[case]]+=1
+					        	testPrecision=1-testError
+        						minError=min(minError,testError)					
+	        					finalPrecision=testPrecision
+		        				bestValPrecision=validatePrecision
+			        			print 'testing precision=%f%%'%(testPrecision*100.)
+				        		maxEpoch=max(maxEpoch,epoch*1.5)
+                                                        self.testAcc.append({'x':x,'acc':testPrecision})
+        					print 'bestValPrecision=%f%%'%(bestValPrecision*100.)
+                                        else:
+                                                print 'epoch=%i,num=%i,train precision=%f%%'%(epoch,num,trainPrecision*100.)
+                                                testError=testModel(testX,testY)
+                                                testPrecision=1-testError
+                                                minError=min(minError,testError)
+                                                finalPrecision=testPrecision
                                                 self.testAcc.append({'x':x,'acc':testPrecision})
-					print 'bestValPrecision=%f%%'%(bestValPrecision*100.)
+			                        print 'bestTestPrecision=%f%%, finalPrecision=%f%%'%((1-minError)*100.,finalPrecision*100.)
 				num+=1
 
 			x=float(epoch)
@@ -278,29 +295,42 @@ class RCNNModel(object):
                         trainCost,trainError=np.mean(trainResult,axis=0)
 			trainPrecision=1-trainError
                         self.costValue.append({'x':x,'value':trainCost})
-			validateError=[
-				validateModel(i)
-				for i in xrange(validateBatches)
-			]
-			validatePrecision=1-np.mean(validateError)
-			print 'epoch=%i,train precision=%f%%, validation precision=%f%%'%(epoch,trainPrecision*100.,validatePrecision*100.)
-			self.trainAcc.append({'x':x,'acc':trainPrecision})
-			self.validateAcc.append({'x':x,'acc':validatePrecision})
-			if validatePrecision>bestValPrecision:
-				testError=testModel(testX,testY)
-				testPrecision=1-testError
-				minError=min(minError,testError)
-				finalPrecision=testPrecision
-				bestValPrecision=validatePrecision
-				print 'testing precision=%f%%'%(testPrecision*100.)
-                                maxEpoch=max(maxEpoch,epoch*1.5)
-				self.testAcc.append({'x':x,'acc':testPrecision})
-			print 'bestValPrecision=%f%%'%(bestValPrecision*100.)
+	        	self.trainAcc.append({'x':x,'acc':trainPrecision})
+                        if self.useVal:
+        			validateError=[
+	        			validateModel(i)
+		        		for i in xrange(validateBatches)
+			        ]
+			        validatePrecision=1-np.mean(validateError)
+        			print 'epoch=%i,train precision=%f%%, validation precision=%f%%'%(epoch,trainPrecision*100.,validatePrecision*100.)
+		        	self.validateAcc.append({'x':x,'acc':validatePrecision})
+			        if validatePrecision>bestValPrecision:
+        				testPredict,testError=testModel(testX,testY)
+	        			assert len(testPredict)==len(testY)
+                                        testMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+                                        for case in xrange(len(testY)):
+                                            testMatrix[testY[case],testPredict[case]]+=1
+                                        testPrecision=1-testError
+		        		minError=min(minError,testError)
+			        	finalPrecision=testPrecision
+				        bestValPrecision=validatePrecision
+        				print 'testing precision=%f%%'%(testPrecision*100.)
+                                        maxEpoch=max(maxEpoch,epoch*1.5)
+		        		self.testAcc.append({'x':x,'acc':testPrecision})
+			        print 'bestValPrecision=%f%%'%(bestValPrecision*100.)
+                        else:
+                                print 'epoch=%i,train precision=%f%%'%(epoch,trainPrecision*100.)
+                                testError=testModel(testX,testY)
+                                testPrecision=1-testError
+                                minError=min(minError,testError)
+                                finalPrecision=testPrecision
+                                self.testAcc.append({'x':x,'acc':testPrecision})
 			print 'bestTestPrecision=%f%%, finalPrecision=%f%%'%((1-minError)*100.,finalPrecision*100.)
 
 		self.result={'minError':minError,'finalAcc':finalPrecision,'bestValAcc':bestValPrecision}
+                testPredictInfo={'testPredict':testPredict,'predictMatrix':testMatrix}
 
-		return finalPrecision
+		return testPredictInfo,finalPrecision
 
 	def save(self):
 		savePath='../Results/'
