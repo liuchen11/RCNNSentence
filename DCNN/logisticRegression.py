@@ -22,14 +22,14 @@ class LogisticRegression(object):
 			name='w',
 			borrow=True
 			)
-		#self.b=theano.shared(
-		#	value=np.zeros((n_out,),dtype=theano.config.floatX),
-		#	name='b',
-		#	borrow=True
-		#	)
-		self.param=[self.w]
+		self.b=theano.shared(
+			value=np.zeros((n_out,),dtype=theano.config.floatX),
+			name='b',
+			borrow=True
+			)
+		self.param=[self.w,self.b]
 
-		self.output=softmax(T.dot(input,self.w))
+		self.output=softmax(T.dot(input,self.w)+self.b)
 		self.predict=T.argmax(self.output,axis=1)
 
 	def negative_log_likelyhood(self,y):

@@ -9,7 +9,7 @@ from loadWordVec import *
 from hiddenLayer import *
 from logisticRegression import *
 from normLayer import *
-from recurrentConvLayer import *
+#from recurrentConvLayer import *
 from convLayer import *
 
 sys.setrecursionlimit(40000)
@@ -68,7 +68,7 @@ def AdadeltaMomentumUpdate(params,cost,stepSize=1.0,momentum=0.9,rho=0.95,epsilo
             updates[param]=newParam
     return updates
 
-def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
+def AdadeltaUpdate(params,cost,stepSize=1.0,rho=0.95,epsilon=1e-6,norm_lim=9):
     updates=OrderedDict({})
     exp_sqr_grads=OrderedDict({})
     exp_sqr_update=OrderedDict({})
@@ -86,7 +86,7 @@ def AdadeltaUpdate(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9):
         updates[exp_sg]=update_exp_sg
         
         step=-(T.sqrt(exp_su+epsilon)/T.sqrt(update_exp_sg+epsilon))*gp
-        stepped_param=param+step
+        stepped_param=param+step*stepSize
         
         update_exp_su=rho*exp_su+(1-rho)*T.sqr(step)
         updates[exp_su]=update_exp_su
@@ -136,7 +136,7 @@ def sgd(params,cost,learningRate):
 
 class DRCNNModel(object):
 
-    def __init__(self,wordMatrix,shape,filters,rfilter,features,poolSize,time,categories,static,dropoutRate,learningRate,name):
+    def __init__(self,wordMatrix,shape,filters,rfilter,features,poolSize,time,categories,static,dropoutRate,learningRate,useVal,name):
         '''
         >>>initialize the model
         
@@ -162,13 +162,17 @@ class DRCNNModel(object):
         >>>para dropoutRate: dropout rate of each layer
         >>>type learningRate: float
         >>>para learningRate: learning rate
+        >>>type useVal: bool
+        >>>para useVal: whether or not to use validation set
         >>>type name: str
         >>>para name: the name of the model
         '''
         self.learningRate=learningRate
         self.static=static
         self.name=name
+        self.useVal=useVal
         self.batchSize,self.featureMaps,self.sentenceLen,self.wdim=shape
+        self.categories=categories
 
         rng=np.random.RandomState(2011010539)
         
@@ -224,7 +228,7 @@ class DRCNNModel(object):
         
         self.sgdUpdate=sgd(self.params,self.cost,self.lr)
         self.sgdMomentumUpdate=sgdMomentum(self.params,self.cost,self.lr)
-        self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost)
+        self.adadeltaUpdate=AdadeltaUpdate(self.params,self.cost,self.lr)
         self.adadeltaMomentumUpdate=AdadeltaMomentumUpdate(params=self.params,cost=self.cost,stepSize=self.lr)
 
         self.sgdDelta=self.plotUpdate(self.sgdUpdate)
@@ -307,10 +311,11 @@ class DRCNNModel(object):
         print 'SGD-Momentum TrainModel Constructed!'
 
         adadeltaTrainModel=theano.function(
-                [index],[self.cost,self.adadeltaDelta[0],self.adadeltaDelta[1],self.adadeltaDelta[2]],updates=self.adadeltaUpdate,
+                [index,stepSize],[self.cost,self.adadeltaDelta[0],self.adadeltaDelta[1],self.adadeltaDelta[2]],updates=self.adadeltaUpdate,
                 givens={
                     self.x:trainX[index*self.batchSize:(index+1)*self.batchSize],
-                    self.y:trainY[index*self.batchSize:(index+1)*self.batchSize]}
+                    self.y:trainY[index*self.batchSize:(index+1)*self.batchSize],
+                    self.lr:stepSize}
                 )
         print 'Adadelta TrainModel Constructed!'
 
@@ -347,7 +352,7 @@ class DRCNNModel(object):
         testClassifierInput=testInput.flatten(2)
         testPredict=self.classifier.predictInstance(testClassifierInput)
         testError=T.mean(T.neq(testPredict,self.y))
-        testModel=theano.function([self.x,self.y],testError)
+        testModel=theano.function([self.x,self.y],[testPredict,testError])
         print 'Testing Model Constructed!'
 
         epoch=0
@@ -362,50 +367,54 @@ class DRCNNModel(object):
         self.validateAccs=[]
         self.testAccs=[]
         self.costValues=[]
-        self.result={}
+        self.result={'minError':1.00,'finalAcc':0.00,'bestValAcc':0.00}
+        testPredict=np.zeros(shape=(testSize,),dtype='int32')
+        testMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
 
-        while epoch<nEpoch and epoch<maxEpoch:
+        while epoch<nEpoch:
             epoch+=1
             num=0
 
             for minBatch in np.random.permutation(range(trainBatches)):
-                cost,dmax,dmin,dmean=adadeltaTrainModel(minBatch)
-                #cost=adadeltaMomentumTrainModel(minBatch,steppingSize)
+                cost,dmax,dmin,dmean=adadeltaTrainModel(minBatch,learningRate)
+                #cost=sgdMomentumTrainModel(minBatch,self.learningRate)
+                #adadeltaMomentumTrainModel(minBatch,self.learningRate)
                 x=float(epoch)+float(num+1)/float(trainBatches)-1
-                #self.costValues.append({'x':x,'value':cost})
-                #if num%10==0:
-                #    print 'max:',dmax
-                #    print 'min:',dmin
-                #    print 'mean:',dmean
                 if num%50==0:
                     trainResult=[testTrain(i) for i in xrange(trainBatches)]
                     trainCost,trainError=np.mean(trainResult,axis=0)
                     trainAcc=1-trainError
                     self.costValues.append({'x':x,'value':trainCost})
-                    validateError=[validateModel(i) for i in xrange(validateBatches)]
-                    validateAcc=1-np.mean(validateError)
                     self.trainAccs.append({'x':x,'acc':trainAcc})
-                    self.validateAccs.append({'x':x,'acc':validateAcc})
-                    print'Epoch=%i,Num=%i,TrainAcc=%f%%,ValidateAcc=%f%%'%(epoch,num,trainAcc*100.,validateAcc*100.)
+                    if self.useVal:
+                        validateError=[validateModel(i) for i in xrange(validateBatches)]
+                        validateAcc=1-np.mean(validateError)
+                        self.validateAccs.append({'x':x,'acc':validateAcc})
+                        print 'Epoch=%i,Num=%i,TrainAcc=%f%%,ValidateAcc=%f%%'%(epoch,num,trainAcc*100.,validateAcc*100.)
+                    else:
+                        print 'Epoch=%i,Num=%i,TrainAcc=%f%%'%(epoch,num,trainAcc*100.)
+                    print 'costValue=%f, learningRate=%f'%(trainCost,self.learningRate)
+                    
+                    testPredict,testError=testModel(testX,testY)
+                    assert len(testPredict)==len(testY)
+                    testMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+                    for case in xrange(len(testY)):
+                        testMatrix[testY[case],testPredict[case]]+=1
+                    testAcc=1-testError
+                    self.testAccs.append({'x':x,'acc':testAcc})
+                    print 'TestAcc=%f%%'%(testAcc*100.)
 
-                    if validateAcc>bestValAcc:
-                        testError=testModel(testX,testY)
-                        testAcc=1-testError
+                    if self.useVal and validateAcc>bestValAcc:
                         bestValAcc=validateAcc
                         bestTestAcc=max(bestTestAcc,testAcc)
                         finalAcc=testAcc
-                        self.testAccs.append({'x':x,'acc':testAcc})
-                        print 'TestAcc=%f%%'%(testAcc*100.)
                         localOpt=0
                         maxEpoch=max(maxEpoch,epoch*1.5)
-                    else:
-                        localOpt+=1
-                        if localOpt>=5:
-                            learningRate/=10
-                            steppingSize/=2
-                            localOpt=0
-                            print 'Learning Rate %f->%f'%(learningRate*10.,learningRate)
-                            print 'stepping Size %f->%f'%(steppingSize*2.,steppingSize)
+                        self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}
+                    elif not self.useVal:
+                        bestTestAcc=max(bestTestAcc,testAcc)
+                        finalAcc=testAcc
+                        self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}
                     print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc*100.,bestTestAcc*100.,finalAcc*100.)
                 num+=1
 
@@ -414,34 +423,40 @@ class DRCNNModel(object):
             trainCost,trainError=np.mean(trainResult,axis=0)
             trainAcc=1-trainError
             self.costValues.append({'x':x,'value':trainCost})
-            validateError=[validateModel(i) for i in xrange(validateBatches)]
-            validateAcc=1-np.mean(validateError)
             self.trainAccs.append({'x':x,'acc':trainAcc})
-            self.validateAccs.append({'x':x,'acc':validateAcc})
-            print 'Epoch=%i,TrainAcc=%f%%,ValidateAcc=%f%%'%(epoch,trainAcc*100.,validateAcc*100.)
+            if self.useVal:
+                validateError=[validateModel(i) for i in xrange(validateBatches)]
+                validateAcc=1-np.mean(validateError)
+                self.validateAccs.append({'x':x,'acc':validateAcc})
+                print 'Epoch=%i,TrainAcc=%f%%,ValidateAcc=%f%%'%(epoch,trainAcc*100.,validateAcc*100.)
+            else:
+                print 'Epoch=%i,TrainAcc=%f%%'%(epoch,trainAcc*100.)
+            print 'costValue=%f, learningRate=%f'%(trainCost,self.learningRate)
 
-            if validateAcc>bestValAcc:
-                testError=testModel(testX,testY)
-                testAcc=1-testError
+            testPredict,testError=testModel(testX,testY)
+            assert len(testY)==len(testPredict)
+            testMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+            for case in xrange(len(testY)):
+                testMatrix[testY[case],testPredict[case]]+=1
+            testAcc=1-testError
+            self.testAccs.append({'x':x,'acc':testAcc})
+            print 'TestAcc=%f%%'%(testAcc*100.)
+
+            if self.useVal and validateAcc>bestValAcc:
                 bestValAcc=validateAcc
                 bestTestAcc=max(bestTestAcc,testAcc)
                 finalAcc=testAcc
-                self.testAccs.append({'x':x,'acc':testAcc})
-                print 'TestAcc=%f%%'%(testAcc*100.)
                 localOpt=0
                 maxEpoch=max(maxEpoch,epoch*1.5)
-            else:
-                localOpt+=1
-                if localOpt>=5:
-                    learningRate/=10
-                    steppingSize/=2
-                    localOpt=0
-                    print 'Learning Rate %f->%f'%(learningRate*10.,learningRate)
-                    print 'Stepping Size %f->%f'%(steppingSize*2.,steppingSize)
+                self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}
+            elif not self.useVal:
+                bestTestAcc=max(bestTestAcc,testAcc)
+                finalAcc=testAcc
+                self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}
             print 'BestValAcc=%f%%,BestTestAcc=%f%%,FinalAcc=%f%%'%(bestValAcc*100.,bestTestAcc*100.,finalAcc*100.)
 
-        self.result={'minError':1-bestTestAcc,'finalAcc':finalAcc,'bestValAcc':bestValAcc}
-        return finalAcc
+        testPredictInfo={'testPredict':testPredict,'predictMatrix':testMatrix}
+        return testPredictInfo,finalAcc
 
     def save(self):
         savePath='../Results/'
