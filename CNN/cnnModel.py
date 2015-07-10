@@ -99,6 +99,7 @@ class CNNModel(object):
 		self.learningRate=learningRate
 		self.static=static
 		self.name=name
+                self.categories=categories
 
 		rng=np.random.RandomState(2011010539)
 		self.batchSize,featureMaps,self.sentenceLen,self.dimension=shape
@@ -222,7 +223,7 @@ class CNNModel(object):
 		testLayer1Input=T.concatenate(testLayer0Output,1)
 		testPredict=self.layer1.predictInstance(testLayer1Input)
 		testError=T.mean(T.neq(testPredict,self.y))
-		testModel=theano.function([self.x,self.y],testError)
+		testModel=theano.function([self.x,self.y],[testPredict,testError])
 		print 'testing model constructed!'
 
 		epoch=0
@@ -236,7 +237,9 @@ class CNNModel(object):
 		self.validateAcc=[]
 		self.testAcc=[]
 		self.costValue=[]
-		self.result={}
+		self.result={'minError':1.00,'finalAcc':0.00,'bestValAcc':0.00}
+                testPredict=np.zeros(shape=(testSize,))
+                predictMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')   #predictMatrix[test][predict]
 
 		while epoch<nEpoch and iteration<maxIteration:
 			epoch+=1
@@ -256,7 +259,11 @@ class CNNModel(object):
 					self.trainAcc.append({'x':x,'acc':trainPrecision})
 					self.validateAcc.append({'x':x,'acc':validatePrecision})
 					if validatePrecision>bestValPrecision:
-						testError=testModel(testX,testY)
+						testPredict,testError=testModel(testX,testY)
+                                                assert len(testPredict)==len(testY)
+                                                predictMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+                                                for case in xrange(len(testY)):
+                                                    predictMatrix[testY[case],testPredict[case]]+=1
 						testPrecision=1-testError
 						minError=min(minError,testError)					
 						finalPrecision=testPrecision
@@ -277,7 +284,11 @@ class CNNModel(object):
 			self.trainAcc.append({'x':x,'acc':trainPrecision})
 			self.validateAcc.append({'x':x,'acc':validatePrecision})
 			if validatePrecision>bestValPrecision:
-				testError=testModel(testX,testY)
+				testPredict,testError=testModel(testX,testY)
+                                assert len(testPredict)==len(testY)
+                                predictMatrix=np.zeros(shape=(self.categories,self.categories),dtype='int32')
+                                for case in xrange(len(testY)):
+                                    predictMatrix[testY[case],testPredict[case]]+=1
 				testPrecision=1-testError
 				minError=min(minError,testError)
 				finalPrecision=testPrecision
@@ -288,8 +299,9 @@ class CNNModel(object):
 			print 'bestTestPrecision=%f%%, finalPrecision=%f%%'%((1-minError)*100.,finalPrecision*100.)
 
 		self.result={'minError':minError,'finalAcc':finalPrecision,'bestValAcc':bestValPrecision}
+                testPredictInfo={'testPredict':testPredict,'predictMatrix':predictMatrix}
 
-		return finalPrecision
+		return testPredictInfo,finalPrecision
 
 	def save(self):
 		savePath='../Results/'
