@@ -174,12 +174,12 @@ class DRCNNModel(object):
         
         self.x=T.matrix('x')
         self.y=T.ivector('y')
-        self.lr=T.dscalar('lr')
+        self.lr=T.fscalar('lr')
 
         self.wordVec=theano.shared(wordMatrix,name='wordVec')
         input=self.wordVec[T.cast(self.x.flatten(),dtype='int32')].reshape(shape)
 
-        self.deep=min(len(features),len(filters),len(poolSize),len(time))
+        self.deep=min(len(features),len(filters),len(poolSize),len(time),len(rfilter))
         self.layers=[]
         print 'This is a network of %i layer(s)'%self.deep
 
@@ -294,8 +294,8 @@ class DRCNNModel(object):
         validateBatches=validateSize/self.batchSize
 
         index=T.iscalar('index')
-        learnRate=T.dscalar('lr')
-        stepSize=T.dscalar('lr')
+        learnRate=T.fscalar('lr')
+        stepSize=T.fscalar('lr')
 
         sgdTrainModel=theano.function(
                 [index,learnRate],self.cost,updates=self.sgdUpdate,
@@ -371,7 +371,7 @@ class DRCNNModel(object):
         self.validateAccs=[]
         self.testAccs=[]
         self.costValues=[]
-        self.result={}
+        self.result={'minError':1.00,'finalAcc':0.00,'bestValAcc':0.00}
 
         while epoch<nEpoch and epoch<maxEpoch:
             epoch+=1

@@ -1,4 +1,5 @@
 import sys,warnings
+import cPickle,time
 import numpy as np
 
 from drcnnModel import *
@@ -57,15 +58,19 @@ def loadDatas(dataFile,wordVecFile='',dimension=300,rand=False):
 
 	return sentences,vocab,config,vectors,wordIndex
 
-def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
+def parseConfig(sentences,vocab,config,vectors,wordIndex,static,useVal,name,load):
 	'''
 	>>>load configs to generate model and train/validate/test batches
 
 	>>>sentences/vocab/config/vectors/wordIndex is the same in README.md file of each dataset
 	>>>type static:bool
 	>>>para static:whether or not to use static wordVec
+	>>>type useVal:bool
+	>>>para useVal:whether or not to use validation set
 	>>>type name:str
 	>>>para name:the name of the model
+	>>>type load:str
+	>>>para load:model to be reloaded
 	'''
 	categories=config['classes']
 	sets=config['all']
@@ -109,7 +114,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			testSetX+=setMatrix[subset]
 			testSetY+=setClasses[subset]
 
-		if len(validation)==0:				#No ValidationSet
+		if useVal and len(validation)==0:				#No ValidationSet
 			newTrainSetX=[];newValidationSetX=[]
 			newTrainSetY=[];newValidationSetY=[]
 			index=0
@@ -131,6 +136,11 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			trainSetX=newTrainSetX;validationSetX=newValidationSetX
 			trainSetY=newTrainSetY;validationSetY=newValidationSetY
 				
+		if not useVal:
+			for i in xrange(len(validationSetX)):
+				trainSetX.append(validationSetX[i])
+				trainSetY.append(validationSetY[i])
+
 		if len(trainSetX)%batchSize>0:
 			extraNum=batchSize-len(trainSetX)%batchSize
 			extraIndex=np.random.permutation(range(len(trainSetX)))
@@ -138,7 +148,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 				trainSetX.append(trainSetX[extraIndex[i]])
 				trainSetY.append(trainSetY[extraIndex[i]])
 
-		if len(validationSetX)%batchSize>0:
+		if useVal and len(validationSetX)%batchSize>0:
 			extraNum=batchSize-len(validationSetX)%batchSize
 			extraIndex=np.random.permutation(range(len(validationSetX)))
 			for i in xrange(extraNum):
@@ -152,23 +162,37 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 		testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 		testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
-                network=DRCNNModel(
-                    wordMatrix=vectors,
-                    shape=(batchSize,1,maxLen,dimension),
-                    filters=((3,300),(3,1),(3,1),(3,1)),
-                    rfilter=((0,0),(3,1),(3,1)),
-                    features=(32,64,128,256),
-                    poolSize=((1,1),(1,1),(2,1),((maxLen-6)/2-2,1)),
-                    time=1,categories=categories,
-                    static=static,
-                    dropoutRate=(0.1,0.2,0.3,0.5),
-                    learningRate=0.1,
-                    name=name
-                    )
+                if load=='' or load==None:
+                        network=DRCNNModel(
+                            wordMatrix=vectors,
+                            shape=(batchSize,1,maxLen,dimension),
+                            filters=((3,300),(3,1),(3,1),(3,1)),
+                            rfilter=((0,0),(3,1),(3,1)),
+                            features=(32,64,128,256),
+                            poolSize=((1,1),(1,1),(2,1),((maxLen-6)/2-2,1)),
+                            time=(0,1,1,1),categories=categories,
+                            static=static,
+                            dropoutRate=(0.1,0.2,0.3,0.5),
+                            learningRate=0.1,
+                            name=name
+                        )
+                else:
+                        cPickle.load(open(load,'rb'))
 
-		precision=network.train_validate_test(trainSet,validateSet,testSet,10)
-		network.save()
-		print 'Model '+name+' :Final Precision Rate %f%%'%(precision*100.)
+                try:
+		        precision=network.train_validate_test(trainSet,validateSet,testSet,10)
+                except:
+                        timeStruct=time.localtime(time.time())
+                        fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+network.name
+                        cPickle.dump(network,open(fileName,'wb'))
+                finally:
+		        network.save()
+
+                timeStruct=time.localtime(time.time())
+                fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+str(precision)+'_'+network.name
+                cPickle.dump(network,open(fileName,'wb'))
+		
+                print 'Model '+name+' :Final Precision Rate %f%%'%(precision*100.)
 	else:
 		precisions=[]
 		for item in sets:
@@ -183,28 +207,27 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 					testSetX+=setMatrix[subset]
 					testSetY+=setClasses[subset]
 
-			#No ValidationSet
-			newTrainSetX=[];newValidationSetX=[]
-			newTrainSetY=[];newValidationSetY=[]
+                        if useVal:#No ValidationSet
+			        newTrainSetX=[];newValidationSetX=[]
+        			newTrainSetY=[];newValidationSetY=[]
 			
-			validateEachType=int(len(trainSetX)*0.1/categories)
-			validationType=[]
-			for i in xrange(categories):
-				validationType.append(0)
+	        		validateEachType=int(len(trainSetX)*0.1/categories)
+		        	validationType=[]
+        			for i in xrange(categories):
+	        			validationType.append(0)
 
-			for i in np.random.permutation(range(len(trainSetX))):
-				Type=trainSetY[i]
-				if validationType[Type]<validateEachType:
-					newValidationSetX.append(trainSetX[i])
-					newValidationSetY.append(trainSetY[i])
-					validationType[Type]+=1
-				else:
-					newTrainSetX.append(trainSetX[i])
-					newTrainSetY.append(trainSetY[i])
+		        	for i in np.random.permutation(range(len(trainSetX))):
+			        	Type=trainSetY[i]
+				        if validationType[Type]<validateEachType:
+        					newValidationSetX.append(trainSetX[i])
+	        				newValidationSetY.append(trainSetY[i])
+		        			validationType[Type]+=1
+			        	else:
+				        	newTrainSetX.append(trainSetX[i])
+					        newTrainSetY.append(trainSetY[i])
 
-			trainSetX=newTrainSetX;validationSetX=newValidationSetX
-			trainSetY=newTrainSetY;validationSetY=newValidationSetY
-
+        			trainSetX=newTrainSetX;validationSetX=newValidationSetX
+	        		trainSetY=newTrainSetY;validationSetY=newValidationSetY
 
 			if len(trainSetX)%batchSize>0:
 				extraNum=batchSize-len(trainSetX)%batchSize
@@ -213,7 +236,7 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 					trainSetX.append(trainSetX[extraIndex[i]])
 					trainSetY.append(trainSetY[extraIndex[i]])
 
-			if len(validationSetX)%batchSize>0:
+			if useVal and len(validationSetX)%batchSize>0:
 				extraNum=batchSize-len(validationSetX)%batchSize
 				extraIndex=np.random.permutation(range(len(validationSetX)))
 				for i in xrange(extraNum):
@@ -227,25 +250,38 @@ def parseConfig(sentences,vocab,config,vectors,wordIndex,static,name):
 			testSet['x']=np.array(testSetX,dtype=theano.config.floatX)
 			testSet['y']=np.array(testSetY,dtype=theano.config.floatX)
 
+                        if load=='' or load==None:
+                                network=DRCNNModel(
+                                    wordMatrix=vectors,
+                                    shape=(batchSize,1,maxLen,dimension),
+                                    filters=((3,300),(3,1),(5,1)),
+                                    rfilter=((0,0),(3,1),(5,1)),
+                                    features=(200,100,100),
+                                    poolSize=((2,1),(1,1),((maxLen-2)/2-4,1)),
+                                    time=(0,1,1),
+                                    categories=categories,
+                                    static=static,
+                                    dropoutRate=(0,0,0,0),
+                                    learningRate=0.001,
+                                    name=name
+                                    )
+                        else:
+                                cPickle.dump(network,open(load,'wb'))
                         
-                        network=DRCNNModel(
-                            wordMatrix=vectors,
-                            shape=(batchSize,1,maxLen,dimension),
-                            filters=((3,300),(3,1),(5,1)),
-                            rfilter=((0,0),(3,1),(5,1)),
-                            features=(200,100,100),
-                            poolSize=((2,1),(1,1),((maxLen-2)/2-4,1)),
-                            time=[0,1,1],
-                            categories=categories,
-                            static=static,
-                            dropoutRate=(0,0,0,0),
-                            learningRate=0.001,
-                            name=name
-                            )
-                        
-			precision=network.train_validate_test(trainSet,validateSet,testSet,25)
-			network.save()
-			precisions.append(precision)
+                        try:
+			        precision=network.train_validate_test(trainSet,validateSet,testSet,25)
+                        except:
+                                timeStruct=time.localtime(time.time())
+                                fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+network.name
+                                cPickle.dump(network,open(fileName,'wb'))
+                        finally:
+			        network.save()
+
+                        timeStruct=time.localtime(time.time())
+                        fileName=str(timeStruct.tm_mon)+'_'+str(timeStruct.tm_mday)+'_'+str(timeStruct.tm_hour)+'_'+str(timeStruct.tm_min)+'__'+str(precision)+'_'+network.name
+                        cPickle.dump(network,open(fileName,'wb'))
+			
+                        precisions.append(precision)
 		print 'Model '+name+' :Final Precision Rate %f%%'%(np.mean(precisions)*100.)
 
 if __name__=='__main__':
@@ -255,6 +291,8 @@ if __name__=='__main__':
 	dataFile=''
 	vecFile=''
 	name='Model'
+	useVal=True
+	load=''
 
 	for i in xrange(len(sys.argv)):
 		if i==0:
@@ -265,6 +303,8 @@ if __name__=='__main__':
 			mode=2
 		elif sys.argv[i]=='-n':
 			mode=3
+		elif sys.argv[i]=='-r':
+			mode=4
 		else:
 			if mode==1:
 				dataFile=sys.argv[i]
@@ -275,6 +315,9 @@ if __name__=='__main__':
 			elif mode==3:
 				name=sys.argv[i]
 				mode=0
+			elif mode==4:
+				load=sys.argv[i]
+				mode=0
 			else:
 				if sys.argv[i]=='-nonstatic':
 					static=False
@@ -284,6 +327,8 @@ if __name__=='__main__':
 					rand=True
 				elif sys.argv[i]=='-word2vec':
 					rand=False
+				elif sys.argv[i]=='-noval':
+					useVal=False
 				else:
 					raise NotImplementedError('command line error')
 	print 'config: dataFile:%s, vecFile:%s, static:%r, rand:%r'%(dataFile,vecFile,static,rand)
@@ -310,4 +355,4 @@ if __name__=='__main__':
 	print 'model '+name+' saved!'
 
 	sentences,vocab,config,vectors,wordIndex=loadDatas(dataFile=dataFile,wordVecFile=vecFile,dimension=300,rand=rand)
-	parseConfig(sentences,vocab,config,vectors,wordIndex,static,name)
+	parseConfig(sentences,vocab,config,vectors,wordIndex,static,useVal,name,load)
